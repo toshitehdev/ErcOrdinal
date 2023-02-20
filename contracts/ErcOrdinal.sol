@@ -11,13 +11,44 @@ contract ErcOrdinal {
     string token_symbol = "ERCORD";
     uint8 token_decimals = 0;
     address the_creator;
+    //this is to track how many tokens already mined
+    uint256[] public token_ids;
     mapping(address => mapping(address => uint256)) spender_allowance;
+    //map token ID to Tokens struct
+    mapping(uint256 => Tokens) public idToTokens;
+    //create array of token ID's an address own
+    mapping(address => uint256[]) public addressToTokenIds;
+    mapping(address => mapping(uint256 => TokenIndex)) idToTokenIndex;
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(
         address indexed owner,
         address indexed spender,
         uint256 value
     );
+    //needs one more to track index of ID's inserted, index started from 1
+    struct TokenIndex {
+        uint256 index;
+    }
+    struct Tokens {
+        uint256 id;
+        string name;
+        string file_uri;
+        address owner;
+        // string rarity;
+    }
+    modifier onlyCreator() {
+        require(
+            msg.sender == the_creator,
+            "Only The Creator is Able to Do That"
+        );
+        _;
+    }
+
+    constructor() {
+        the_creator = msg.sender;
+        genesis();
+        emit Transfer(address(0), the_creator, genesis_supply);
+    }
 
     //function for testing purpose -->
     function changeMaxSupply(uint256 _maxSupply) public {
@@ -30,36 +61,8 @@ contract ErcOrdinal {
 
     //function for testing purpose <--
 
-    struct Tokens {
-        uint256 id;
-        string name;
-        string file_uri;
-        address owner;
-        // string rarity;
-    }
-    //this is to track how many tokens already mined
-    uint256[] public token_ids;
-
     function get_ids_length() public view returns (uint256) {
         return token_ids.length;
-    }
-
-    //map token ID to Tokens struct
-    mapping(uint256 => Tokens) public idToTokens;
-
-    //create array of token ID's an address own
-    mapping(address => uint256[]) public addressToTokenIds;
-
-    //needs one more to track index of ID's inserted, index started from 1
-    struct TokenIndex {
-        uint256 index;
-    }
-    mapping(address => mapping(uint256 => TokenIndex)) idToTokenIndex;
-
-    constructor() {
-        the_creator = msg.sender;
-        genesis();
-        emit Transfer(address(0), the_creator, genesis_supply);
     }
 
     // ERC20 standard implementation -->
@@ -202,7 +205,7 @@ contract ErcOrdinal {
     }
 
     //single transfer, implemented in the Dapp
-    //this is to ensure some tokens wont get transferred in other transfer method
+    //this is to ensure some tokens wont get transferred via other transfer method
     //same idea from ordinals team (BTC ordinal), to keep important satoshis in separate wallet
     function transferSingle(address _recipient, uint256 _id) public {
         //require msg.sender owns the token
@@ -223,13 +226,5 @@ contract ErcOrdinal {
         addressToTokenIds[msg.sender][indexToRemove] = idToMove;
         delete idToTokenIndex[msg.sender][_id];
         addressToTokenIds[msg.sender].pop();
-    }
-
-    modifier onlyCreator() {
-        require(
-            msg.sender == the_creator,
-            "Only The Creator is Able to Do That"
-        );
-        _;
     }
 }
