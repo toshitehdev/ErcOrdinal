@@ -4,13 +4,13 @@ pragma solidity ^0.8.8;
 
 contract ErcOrdinal {
     uint256 genesis_supply = 10;
-    uint256 public MAX_SUPPLY = 100000;
+    uint256 MAX_SUPPLY = 100000;
     uint256 public max_transfer = 11;
-    uint256 public mint_price = 49000000000000000;
+    uint256 mint_price = 49000000000000000;
     string token_name = "ErcOrdinal";
     string token_symbol = "ERCORD";
     uint8 token_decimals = 0;
-    address the_creator;
+    address public the_creator;
     //this is to track how many tokens already mined
     uint256[] public token_ids;
     mapping(address => mapping(address => uint256)) spender_allowance;
