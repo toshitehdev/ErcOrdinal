@@ -9,7 +9,7 @@ describe("ErcOrdinal", function () {
   });
 
   it("Owner should be deployer", async function () {
-    const [owner] = await ethers.getSigners();
+    const [owner] = await hre.ethers.getSigners();
     const deployer = await ercordinal.the_creator();
     assert.equal(owner.address, deployer);
   });
@@ -20,6 +20,24 @@ describe("ErcOrdinal", function () {
     await ercordinal.approve(spender, amountSent);
     const _amount = await ercordinal.allowance(owner.address, spender);
     expect(_amount).to.be.gt(0);
+  });
+  it("Should revert if amount sent more than balance", async function () {
+    const [, addr1, addr2] = await hre.ethers.getSigners();
+    const amount = 1;
+    await ercordinal.transfer(addr1.address, amount);
+    await expect(
+      ercordinal.connect(addr1).transfer(addr2.address, amount + 1)
+    ).to.be.revertedWith("Not enough balance");
+  });
+  it("Should read correct balance of given address", async function () {
+    const [, addr1] = await hre.ethers.getSigners();
+    const amount = 1;
+    const oldBalance = await ercordinal.balanceOf(addr1.address);
+    await ercordinal.transfer(addr1.address, amount);
+    const newBalance = await ercordinal.balanceOf(addr1.address);
+    const expectedBalance =
+      hre.ethers.BigNumber.from(oldBalance).toNumber() + amount;
+    assert.equal(newBalance, expectedBalance);
   });
   it("Changed max_transfer value", async function () {
     const newMax = 20;

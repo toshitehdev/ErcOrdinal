@@ -11,12 +11,9 @@ contract ErcOrdinal {
     string token_symbol = "ERCORD";
     uint8 token_decimals = 0;
     address public the_creator;
-    //this is to track how many tokens already mined
     uint256[] public token_ids;
     mapping(address => mapping(address => uint256)) spender_allowance;
-    //map token ID to Tokens struct
     mapping(uint256 => Tokens) public idToTokens;
-    //create array of token ID's an address own
     mapping(address => uint256[]) public addressToTokenIds;
     mapping(address => mapping(uint256 => TokenIndex)) idToTokenIndex;
     event Transfer(address indexed from, address indexed to, uint256 value);
@@ -25,7 +22,6 @@ contract ErcOrdinal {
         address indexed spender,
         uint256 value
     );
-    //needs one more to track index of ID's inserted, index started from 1
     struct TokenIndex {
         uint256 index;
     }
@@ -183,8 +179,12 @@ contract ErcOrdinal {
         address _recipient,
         uint256 _amount
     ) private {
+        require(
+            _amount <= addressToTokenIds[_sender].length,
+            "Not enough balance"
+        );
         require(_amount < max_transfer, "Reached max transfer cap");
-        require(_amount > 0, "Transfer must be more than 0");
+        require(_sender == msg.sender);
         uint256 senderHoldingsLength = addressToTokenIds[_sender].length;
         for (uint256 i = 1; i < _amount + 1; i++) {
             uint256 idx = senderHoldingsLength - i;
@@ -194,7 +194,6 @@ contract ErcOrdinal {
                 addressToTokenIds[_recipient].length +
                 1;
             addressToTokenIds[_recipient].push(token_id);
-
             //change the tokens owner
             idToTokens[addressToTokenIds[_sender][idx]].owner = _recipient;
             //take out ids, no need to know the ids
