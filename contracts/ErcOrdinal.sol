@@ -3,7 +3,7 @@
 pragma solidity ^0.8.8;
 
 contract ErcOrdinal {
-    uint256 genesis_supply = 10;
+    uint256 genesis_supply = 50;
     uint256 MAX_SUPPLY = 100000;
     uint256 public max_transfer = 11;
     uint256 mint_price = 49000000000000000;
@@ -14,14 +14,21 @@ contract ErcOrdinal {
     uint256[] public token_ids;
     mapping(address => mapping(address => uint256)) spender_allowance;
     mapping(uint256 => Tokens) public idToTokens;
-    mapping(address => uint256[]) public addressToTokenIds;
-    mapping(address => mapping(uint256 => TokenIndex)) idToTokenIndex;
+    mapping(address => uint256[]) private addressToTokenIds;
+    mapping(address => mapping(uint256 => TokenIndex)) private idToTokenIndex;
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(
         address indexed owner,
         address indexed spender,
         uint256 value
     );
+    /**
+     * @dev TokenIndex is needed to track index of ID's inserted.
+     * Index started from 1
+     * because every index (even the non-existing one) is default to 0.
+     * @notice this index is different from addressToTokenIds
+     * which started from 0, normal array
+     */
     struct TokenIndex {
         uint256 index;
     }
@@ -108,7 +115,10 @@ contract ErcOrdinal {
         address _recipient,
         uint256 _amount
     ) public returns (bool) {
-        require(spender_allowance[_sender][msg.sender] >= _amount);
+        require(
+            spender_allowance[_sender][msg.sender] >= _amount,
+            "Not enough allowance"
+        );
         transferBulk(_sender, _recipient, _amount);
         spender_allowance[_sender][msg.sender] -= _amount;
         return true;
@@ -146,11 +156,24 @@ contract ErcOrdinal {
         }
     }
 
+    function getAddressToIds(
+        address _owner
+    ) public view returns (uint256[] memory) {
+        return addressToTokenIds[_owner];
+    }
+
+    function getIdToIndex(
+        address _owner,
+        uint256 _token_id
+    ) public view returns (TokenIndex memory) {
+        return idToTokenIndex[_owner][_token_id];
+    }
+
     //rest of the supply can be minted
     function mint(string memory _name, string memory _file_uri) public payable {
         //require : mint indexed must be less than max supply
-        require(token_ids.length < MAX_SUPPLY);
-        require(msg.value > mint_price);
+        require(token_ids.length < MAX_SUPPLY, "Max supply reached");
+        require(msg.value > mint_price, "Not enough ETH");
         idToTokens[token_ids.length] = Tokens({
             id: token_ids.length,
             name: _name,
@@ -173,7 +196,12 @@ contract ErcOrdinal {
 
     //SWAP single token to ERC721 compliant, a.k.a NFT
 
-    //transfer bulk, applicable to transfer ERC20 standard
+    /**
+     * @notice max_transfer is maximum transfer allowed + 1
+     * if your maximum transfer allowed is 10, max_transfer = 11
+     * @dev reason max_transfer being maximum allowed +1
+     * is to avoid using <= operator, to save some gas
+     */
     function transferBulk(
         address _sender,
         address _recipient,
@@ -184,7 +212,6 @@ contract ErcOrdinal {
             "Not enough balance"
         );
         require(_amount < max_transfer, "Reached max transfer cap");
-        require(_sender == msg.sender);
         uint256 senderHoldingsLength = addressToTokenIds[_sender].length;
         for (uint256 i = 1; i < _amount + 1; i++) {
             uint256 idx = senderHoldingsLength - i;
@@ -207,9 +234,11 @@ contract ErcOrdinal {
     //this is to ensure some tokens wont get transferred via other transfer method
     //same idea from ordinals team (BTC ordinal), to keep important satoshis in separate wallet
     function transferSingle(address _recipient, uint256 _id) public {
-        //require msg.sender owns the token
-        require(idToTokens[_id].owner == msg.sender);
-        //add token to recipient
+        require(idToTokens[_id].owner == msg.sender, "Must be the owner");
+        uint256 senderLastIndex = addressToTokenIds[msg.sender].length - 1;
+        uint256 senderLastId = addressToTokenIds[msg.sender][senderLastIndex];
+        //_id won't be duplicate
+        //once sent, ownership changed
         idToTokenIndex[_recipient][_id].index =
             addressToTokenIds[_recipient].length +
             1;
@@ -219,10 +248,10 @@ contract ErcOrdinal {
         //find the index position of _id
         uint256 indexToRemove = idToTokenIndex[msg.sender][_id].index;
         //move last id on the arrays
-        uint256 idToMove = addressToTokenIds[msg.sender][
-            addressToTokenIds[msg.sender].length - 1
-        ];
-        addressToTokenIds[msg.sender][indexToRemove] = idToMove;
+        uint256 idToMove = addressToTokenIds[msg.sender][senderLastIndex];
+        addressToTokenIds[msg.sender][indexToRemove - 1] = idToMove;
+        //update idTotokenIndex for sender
+        idToTokenIndex[msg.sender][senderLastId].index = indexToRemove;
         delete idToTokenIndex[msg.sender][_id];
         addressToTokenIds[msg.sender].pop();
     }
