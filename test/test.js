@@ -93,7 +93,7 @@ describe("ErcOrdinal", function () {
 
   it("Should add +1 id's length given correct mint price", async function () {
     const oldLength = await ercordinal.get_ids_length();
-    await ercordinal.mint("somestring", "somestring", {
+    await ercordinal.mint({
       value: hre.ethers.utils.parseEther("0.05"),
     });
     const newLength = await ercordinal.get_ids_length();
@@ -103,7 +103,7 @@ describe("ErcOrdinal", function () {
 
   it("Should revert if ETH send < mint price", async function () {
     await expect(
-      ercordinal.mint("somestring", "somestring", {
+      ercordinal.mint({
         value: hre.ethers.utils.parseEther("0.03"),
       })
     ).to.be.reverted;
@@ -169,4 +169,6 @@ describe("ErcOrdinal", function () {
     const token = await ercordinal.idToTokens(7);
     assert.equal(token.owner, addr1.address);
   });
+
+  //test withdraw scenario
 });

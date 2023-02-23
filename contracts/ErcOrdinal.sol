@@ -34,8 +34,6 @@ contract ErcOrdinal {
     }
     struct Tokens {
         uint256 id;
-        string name;
-        string file_uri;
         address owner;
         // string rarity;
     }
@@ -134,25 +132,15 @@ contract ErcOrdinal {
     function genesis() private {
         //genesis 0 for the creator
         token_ids.push(0);
-        idToTokens[0] = Tokens({
-            id: 0,
-            name: "i am the creator",
-            file_uri: "ipfs://genesis-file",
-            owner: the_creator
-        });
+        idToTokens[0] = Tokens({id: 0, owner: the_creator});
         addressToTokenIds[the_creator].push(0);
-        idToTokenIndex[the_creator][0].index = 0;
+        idToTokenIndex[the_creator][0].index = 1;
         for (uint256 i = 1; i < genesis_supply; i++) {
             //ID started from 1
             token_ids.push(i);
-            idToTokens[i] = Tokens({
-                id: i,
-                name: "mythic",
-                file_uri: "ipfs://mythic-uri",
-                owner: the_creator
-            });
+            idToTokens[i] = Tokens({id: i, owner: the_creator});
             addressToTokenIds[the_creator].push(i);
-            idToTokenIndex[the_creator][i].index = i;
+            idToTokenIndex[the_creator][i].index = i + 1;
         }
     }
 
@@ -170,14 +158,12 @@ contract ErcOrdinal {
     }
 
     //rest of the supply can be minted
-    function mint(string memory _name, string memory _file_uri) public payable {
+    function mint() external payable {
         //require : mint indexed must be less than max supply
         require(token_ids.length < MAX_SUPPLY, "Max supply reached");
         require(msg.value > mint_price, "Not enough ETH");
         idToTokens[token_ids.length] = Tokens({
             id: token_ids.length,
-            name: _name,
-            file_uri: _file_uri,
             owner: msg.sender
         });
         idToTokenIndex[msg.sender][token_ids.length].index =
