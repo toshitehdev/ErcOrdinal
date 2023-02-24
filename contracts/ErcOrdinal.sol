@@ -211,8 +211,7 @@ contract ErcOrdinal {
                     1;
                 addressToTokenIds[_recipient].push(senderLastTokenId);
                 //change the tokens owner
-                idToTokens[addressToTokenIds[_sender][senderLastTokenIndex]]
-                    .owner = _recipient;
+                idToTokens[senderLastTokenId].owner = _recipient;
                 //take out ids, no need to know the ids
                 addressToTokenIds[_sender].pop();
                 delete idToTokenIndex[_sender][senderLastTokenId];
@@ -235,8 +234,7 @@ contract ErcOrdinal {
                 addressToTokenIds[_recipient][i - 1] = senderLastTokenId;
 
                 //change the tokens owner
-                idToTokens[addressToTokenIds[_sender][senderLastTokenIndex]]
-                    .owner = _recipient;
+                idToTokens[senderLastTokenId].owner = _recipient;
                 //take out ids, no need to know the ids
                 addressToTokenIds[_sender].pop();
                 delete idToTokenIndex[_sender][senderLastTokenId];
