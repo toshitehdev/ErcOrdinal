@@ -199,21 +199,50 @@ contract ErcOrdinal {
         );
         require(_amount < max_transfer, "Reached max transfer cap");
         uint256 senderHoldingsLength = addressToTokenIds[_sender].length;
-        for (uint256 i = 1; i < _amount + 1; i++) {
-            uint256 idx = senderHoldingsLength - i;
-            uint256 token_id = addressToTokenIds[_sender][idx];
-            //add ids, this needs ids instead
-            idToTokenIndex[_recipient][token_id].index =
-                addressToTokenIds[_recipient].length +
-                1;
-            addressToTokenIds[_recipient].push(token_id);
-            //change the tokens owner
-            idToTokens[addressToTokenIds[_sender][idx]].owner = _recipient;
-            //take out ids, no need to know the ids
-            addressToTokenIds[_sender].pop();
-            delete idToTokenIndex[_sender][token_id];
+        uint256 recipientLength = addressToTokenIds[_recipient].length;
+        if (recipientLength < 1) {
+            for (uint256 i = 1; i < _amount + 1; i++) {
+                uint256 senderLastTokenIndex = senderHoldingsLength - i;
+                uint256 senderLastTokenId = addressToTokenIds[_sender][
+                    senderLastTokenIndex
+                ];
+                idToTokenIndex[_recipient][senderLastTokenId].index =
+                    addressToTokenIds[_recipient].length +
+                    1;
+                addressToTokenIds[_recipient].push(senderLastTokenId);
+                //change the tokens owner
+                idToTokens[addressToTokenIds[_sender][senderLastTokenIndex]]
+                    .owner = _recipient;
+                //take out ids, no need to know the ids
+                addressToTokenIds[_sender].pop();
+                delete idToTokenIndex[_sender][senderLastTokenId];
+            }
+
+            emit Transfer(_sender, _recipient, _amount);
+        } else {
+            for (uint256 i = 1; i < _amount + 1; i++) {
+                uint256 senderLastTokenIndex = senderHoldingsLength - i;
+                uint256 senderLastTokenId = addressToTokenIds[_sender][
+                    senderLastTokenIndex
+                ];
+                uint256 idToMove = addressToTokenIds[_recipient][i - 1];
+                //add ids, this needs ids instead
+                idToTokenIndex[_recipient][idToMove].index =
+                    recipientLength +
+                    i;
+                addressToTokenIds[_recipient].push(idToMove);
+                idToTokenIndex[_recipient][senderLastTokenIndex].index = i;
+                addressToTokenIds[_recipient][i - 1] = senderLastTokenId;
+
+                //change the tokens owner
+                idToTokens[addressToTokenIds[_sender][senderLastTokenIndex]]
+                    .owner = _recipient;
+                //take out ids, no need to know the ids
+                addressToTokenIds[_sender].pop();
+                delete idToTokenIndex[_sender][senderLastTokenId];
+            }
+            emit Transfer(_sender, _recipient, _amount);
         }
-        emit Transfer(_sender, _recipient, _amount);
     }
 
     //single transfer, implemented in the Dapp

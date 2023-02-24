@@ -1,4 +1,5 @@
 const hre = require("hardhat");
+
 const { assert, expect } = require("chai");
 
 describe("ErcOrdinal", function () {
@@ -24,8 +25,7 @@ describe("ErcOrdinal", function () {
 
   it("Should revert if amount sent more than balance", async function () {
     const [, addr1, addr2] = await hre.ethers.getSigners();
-    const amount = 1;
-
+    const amount = 3;
     await ercordinal.transfer(addr1.address, amount);
     await expect(
       ercordinal.connect(addr1).transfer(addr2.address, amount + 1)
@@ -170,5 +170,38 @@ describe("ErcOrdinal", function () {
     assert.equal(token.owner, addr1.address);
   });
 
-  //test withdraw scenario
+  it("Should withdraw", async function () {
+    const [, addr1] = await hre.ethers.getSigners();
+    await ercordinal.connect(addr1).mint({
+      value: hre.ethers.utils.parseEther("0.05"),
+    });
+    const [owner] = await hre.ethers.getSigners();
+    const startingContractBalance = await ercordinal.provider.getBalance(
+      ercordinal.address
+    );
+
+    const startingOwnerBalance = await ercordinal.provider.getBalance(
+      owner.address
+    );
+
+    const tx = await ercordinal.withdrawMintSale();
+    const receipt = await tx.wait(1);
+
+    const { gasUsed, effectiveGasPrice } = receipt;
+
+    const gasCost = gasUsed.mul(effectiveGasPrice);
+
+    const endingContractBalance = await ercordinal.provider.getBalance(
+      ercordinal.address
+    );
+    const endingOwnerBalance = await ercordinal.provider.getBalance(
+      owner.address
+    );
+
+    assert.equal(endingContractBalance, 0);
+    assert.equal(
+      startingContractBalance.add(startingOwnerBalance).toString(),
+      endingOwnerBalance.add(gasCost).toString()
+    );
+  });
 });

@@ -33,6 +33,6 @@ module.exports = {
     enabled: false,
     currency: "USD",
     coinmarketcap: CMC_API_KEY,
-    token: "FTM",
+    token: "ETH",
   },
 };
