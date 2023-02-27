@@ -10,6 +10,7 @@ const PRIV_KEY = process.env.PRIV_KEY;
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 const CMC_API_KEY = process.env.CMC_API_KEY;
 const LOCAL_NODE_KEY = process.env.LOCAL_NODE_KEY;
+const REMOTE_NODE_KEY = process.env.REMOTE_NODE_KEY;
 
 module.exports = {
   defaultNetwork: "hardhat",
@@ -23,6 +24,11 @@ module.exports = {
       url: "http://127.0.0.1:8545/",
       accounts: [LOCAL_NODE_KEY],
       chainid: 31337,
+    },
+    remotenode: {
+      url: "http://159.223.87.18:8545",
+      accounts: [REMOTE_NODE_KEY],
+      chainid: 1337,
     },
   },
   solidity: "0.8.8",

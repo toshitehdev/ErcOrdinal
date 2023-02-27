@@ -3,7 +3,7 @@
 pragma solidity ^0.8.8;
 
 contract ErcOrdinal {
-    uint256 genesis_supply = 50;
+    uint256 genesis_supply = 12;
     uint256 MAX_SUPPLY = 100000;
     uint256 public max_transfer = 11;
     uint256 mint_price = 49000000000000000;
@@ -17,6 +17,7 @@ contract ErcOrdinal {
     mapping(address => uint256[]) private addressToTokenIds;
     mapping(address => mapping(uint256 => TokenIndex)) private idToTokenIndex;
     event Transfer(address indexed from, address indexed to, uint256 value);
+    event Mint(address indexed _to, uint256 indexed _id);
     event Approval(
         address indexed owner,
         address indexed spender,
@@ -113,6 +114,7 @@ contract ErcOrdinal {
         address _recipient,
         uint256 _amount
     ) public returns (bool) {
+        // is this Uniswap self transfer?
         require(
             spender_allowance[_sender][msg.sender] >= _amount,
             "Not enough allowance"
@@ -157,6 +159,10 @@ contract ErcOrdinal {
         return idToTokenIndex[_owner][_token_id];
     }
 
+    function getIdToTokens(uint256 _id) public view returns (address) {
+        return idToTokens[_id].owner;
+    }
+
     //rest of the supply can be minted
     function mint() external payable {
         //require : mint indexed must be less than max supply
@@ -171,6 +177,7 @@ contract ErcOrdinal {
             1;
         addressToTokenIds[msg.sender].push(token_ids.length);
         token_ids.push(token_ids.length);
+        emit Mint(msg.sender, token_ids.length);
     }
 
     function withdrawMintSale() public onlyCreator {
@@ -197,6 +204,7 @@ contract ErcOrdinal {
             _amount <= addressToTokenIds[_sender].length,
             "Not enough balance"
         );
+        require(_sender != _recipient);
         require(_amount < max_transfer, "Reached max transfer cap");
         uint256 senderHoldingsLength = addressToTokenIds[_sender].length;
         uint256 recipientLength = addressToTokenIds[_recipient].length;
@@ -206,9 +214,7 @@ contract ErcOrdinal {
                 uint256 senderLastTokenId = addressToTokenIds[_sender][
                     senderLastTokenIndex
                 ];
-                idToTokenIndex[_recipient][senderLastTokenId].index =
-                    addressToTokenIds[_recipient].length +
-                    1;
+                idToTokenIndex[_recipient][senderLastTokenId].index = i;
                 addressToTokenIds[_recipient].push(senderLastTokenId);
                 //change the tokens owner
                 idToTokens[senderLastTokenId].owner = _recipient;
@@ -230,7 +236,7 @@ contract ErcOrdinal {
                     recipientLength +
                     i;
                 addressToTokenIds[_recipient].push(idToMove);
-                idToTokenIndex[_recipient][senderLastTokenIndex].index = i;
+                idToTokenIndex[_recipient][senderLastTokenId].index = i;
                 addressToTokenIds[_recipient][i - 1] = senderLastTokenId;
 
                 //change the tokens owner
@@ -243,10 +249,17 @@ contract ErcOrdinal {
         }
     }
 
+    function transferMany(address _recipient, uint256[] memory _ids) public {
+        for (uint256 i = 0; i < _ids.length; i++) {
+            transferSingle(_recipient, _ids[i]);
+        }
+    }
+
     //single transfer, implemented in the Dapp
     //this is to ensure some tokens wont get transferred via other transfer method
     //same idea from ordinals team (BTC ordinal), to keep important satoshis in separate wallet
     function transferSingle(address _recipient, uint256 _id) public {
+        require(_recipient != msg.sender);
         require(idToTokens[_id].owner == msg.sender, "Must be the owner");
         uint256 senderLastIndex = addressToTokenIds[msg.sender].length - 1;
         uint256 senderLastId = addressToTokenIds[msg.sender][senderLastIndex];
