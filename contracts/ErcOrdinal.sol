@@ -183,7 +183,7 @@ contract ErcOrdinal {
                 addressToTokenIds[msg.sender].length +
                 1;
             addressToTokenIds[msg.sender].push(token_counter);
-            token_counter += _amount;
+            token_counter += 1;
             emit Mint(msg.sender, token_counter);
         }
     }
