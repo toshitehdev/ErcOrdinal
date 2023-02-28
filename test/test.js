@@ -9,21 +9,118 @@ describe("ErcOrdinal", function () {
     ercordinal = await ErcOrdinal.deploy();
   });
 
-  it("Owner should be deployer", async function () {
+  it("Owner should be msg.sender", async function () {
     const [owner] = await hre.ethers.getSigners();
-    const deployer = await ercordinal.the_creator();
-    assert.equal(owner.address, deployer);
+    const creator = await ercordinal.the_creator();
+    assert.equal(owner.address, creator);
   });
+
+  it("Token counter should be same as genesis supply", async function () {
+    const genesis_supply = await ercordinal.getGenesisSupply();
+    const token_counter = await ercordinal.token_counter();
+    assert.equal(
+      hre.ethers.BigNumber.from(genesis_supply).toNumber(),
+      hre.ethers.BigNumber.from(token_counter).toNumber()
+    );
+  });
+
+  it("Deployer should own genesis_supply", async function () {
+    const [owner] = await hre.ethers.getSigners();
+    const genesis_supply = await ercordinal.getGenesisSupply();
+    const address_to_ids = await ercordinal.getAddressToIds(owner.address);
+    assert.equal(
+      hre.ethers.BigNumber.from(genesis_supply).toNumber(),
+      address_to_ids.length
+    );
+  });
+  it("All idToTokens genesis owner is creator", async function () {
+    const [owner] = await hre.ethers.getSigners();
+    const genesis_supply = await ercordinal.getGenesisSupply();
+    const genesis_supply_number =
+      hre.ethers.BigNumber.from(genesis_supply).toNumber();
+    for (let i = 0; i < genesis_supply_number; i++) {
+      let idToTokens = await ercordinal.idToTokens(i);
+      assert.equal(owner.address, idToTokens.owner);
+    }
+  });
+
+  // it("test mint", async function () {
+  //   const [owner] = await hre.ethers.getSigners();
+  //   await ercordinal.mintMany(3, { value: hre.ethers.utils.parseEther("1") });
+  //   await ercordinal.mintMany(2, { value: hre.ethers.utils.parseEther("1") });
+  //   await ercordinal.mint({ value: hre.ethers.utils.parseEther("1") });
+  //   await ercordinal.mintMany(1, { value: hre.ethers.utils.parseEther("1") });
+  //   await ercordinal.mintMany(3, { value: hre.ethers.utils.parseEther("1") });
+  //   await ercordinal.mintMany(1, { value: hre.ethers.utils.parseEther("1") });
+
+  //   const endingBalance = await ercordinal.getAddressToIds(owner.address);
+  //   console.log(endingBalance);
+  //   assert.equal(1, 1);
+  // });
 
   it("Should revert when self tx", async function () {
     const [owner] = await hre.ethers.getSigners();
     await expect(ercordinal.transfer(owner.address, 4)).to.be.reverted;
   });
 
-  it("spender_allowance should have _amount > 0", async function () {
+  it("Should transfer-receive = tail-head, case: recipent dont hold any", async function () {
+    const [owner, addr1] = await hre.ethers.getSigners();
+    const startingSender = await ercordinal.getAddressToIds(owner.address);
+
+    await ercordinal.transfer(addr1.address, 5);
+
+    const endingRecipient = await ercordinal.getAddressToIds(addr1.address);
+
+    assert.equal(
+      hre.ethers.BigNumber.from(startingSender[11]).toNumber(),
+      hre.ethers.BigNumber.from(endingRecipient[0]).toNumber()
+    );
+    assert.equal(
+      hre.ethers.BigNumber.from(startingSender[10]).toNumber(),
+      hre.ethers.BigNumber.from(endingRecipient[1]).toNumber()
+    );
+    assert.equal(
+      hre.ethers.BigNumber.from(startingSender[9]).toNumber(),
+      hre.ethers.BigNumber.from(endingRecipient[2]).toNumber()
+    );
+  });
+
+  it("Should transfer-receive = tail-head, recipent hold already", async function () {
+    const [owner, addr1] = await hre.ethers.getSigners();
+    const startingSender = await ercordinal.getAddressToIds(owner.address);
+    await ercordinal.transfer(addr1.address, 2);
+    await ercordinal.transfer(addr1.address, 3);
+    const endingRecipient = await ercordinal.getAddressToIds(addr1.address);
+    //first two is a push, add to the tail
+    //because holder dont hold any
+    assert.equal(
+      hre.ethers.BigNumber.from(startingSender[11]).toNumber(),
+      hre.ethers.BigNumber.from(endingRecipient[4]).toNumber()
+    );
+    assert.equal(
+      hre.ethers.BigNumber.from(startingSender[10]).toNumber(),
+      hre.ethers.BigNumber.from(endingRecipient[3]).toNumber()
+    );
+    //next transfer is insert to head
+    //because holder already hold tokens
+    assert.equal(
+      hre.ethers.BigNumber.from(startingSender[9]).toNumber(),
+      hre.ethers.BigNumber.from(endingRecipient[0]).toNumber()
+    );
+    assert.equal(
+      hre.ethers.BigNumber.from(startingSender[8]).toNumber(),
+      hre.ethers.BigNumber.from(endingRecipient[1]).toNumber()
+    );
+    assert.equal(
+      hre.ethers.BigNumber.from(startingSender[7]).toNumber(),
+      hre.ethers.BigNumber.from(endingRecipient[2]).toNumber()
+    );
+  });
+
+  it("Approve, spender_allowance should have _amount > 0", async function () {
     const [owner, addr1] = await ethers.getSigners();
-    const amountSent = 1;
-    await ercordinal.approve(addr1.address, amountSent);
+    const allowance = 1;
+    await ercordinal.approve(addr1.address, allowance);
     const _amount = await ercordinal.allowance(owner.address, addr1.address);
     expect(_amount).to.be.gt(0);
   });
@@ -32,6 +129,7 @@ describe("ErcOrdinal", function () {
     const [, addr1, addr2] = await hre.ethers.getSigners();
     const amount = 3;
     await ercordinal.transfer(addr1.address, amount);
+    //try send amount +1 = 4, while addr1 balance is 3
     await expect(
       ercordinal.connect(addr1).transfer(addr2.address, amount + 1)
     ).to.be.revertedWith("Not enough balance");
@@ -40,17 +138,17 @@ describe("ErcOrdinal", function () {
   it("Should revert if amount sent more than max_transfer", async function () {
     const [, addr1] = await hre.ethers.getSigners();
     const max_transfer = await ercordinal.max_transfer();
-    //max_transfer is maximum transfer allowed + 1
-    //see contract function transferBulk
     await expect(
       ercordinal.transfer(addr1.address, max_transfer)
     ).to.be.revertedWith("Reached max transfer cap");
   });
 
-  it("Should revert if spender transfer more than amount", async function () {
+  it("Should revert if spender transfer more than allowance", async function () {
     const [owner, addr1, addr2] = await ethers.getSigners();
     const amount = 10;
+    //owner approved addr1 for 10 allowance
     await ercordinal.approve(addr1.address, amount);
+    //address1 try to transfer amount+1 to address2
     await expect(
       ercordinal
         .connect(addr1)
@@ -96,12 +194,12 @@ describe("ErcOrdinal", function () {
     assert.equal(newMax, expectedMaxTransfer);
   });
 
-  it("Should add +1 id's length given correct mint price", async function () {
-    const oldLength = await ercordinal.get_ids_length();
+  it("Should add +1 to token_counter given correct mint price", async function () {
+    const oldLength = await ercordinal.token_counter();
     await ercordinal.mint({
-      value: hre.ethers.utils.parseEther("0.05"),
+      value: hre.ethers.utils.parseEther("0.02"),
     });
-    const newLength = await ercordinal.get_ids_length();
+    const newLength = await ercordinal.token_counter();
     const expectedLength = hre.ethers.BigNumber.from(oldLength).toNumber() + 1;
     assert.equal(newLength, expectedLength);
   });
@@ -109,17 +207,17 @@ describe("ErcOrdinal", function () {
   it("Should revert if ETH send < mint price", async function () {
     await expect(
       ercordinal.mint({
-        value: hre.ethers.utils.parseEther("0.03"),
+        value: hre.ethers.utils.parseEther("0.019"),
       })
-    ).to.be.reverted;
+    ).to.be.revertedWith("Not enough ETH");
   });
 
   it("Should revert if sender is not the token owner", async function () {
     const [, addr1, addr2] = await hre.ethers.getSigners();
+    //addr1 try to send id#1 to addr2, while he's not the owner
     await expect(
       ercordinal.connect(addr1).transferSingle(addr2.address, 1)
     ).to.be.revertedWith("Must be the owner");
-    assert.equal(1, 1);
   });
 
   it("Should add id length of new owner", async function () {
@@ -135,8 +233,8 @@ describe("ErcOrdinal", function () {
     await ercordinal.transferSingle(addr1.address, 5);
     await ercordinal.transferSingle(addr1.address, 7);
     await ercordinal.transferSingle(addr1.address, 8);
-    const newIndex = await ercordinal.getIdToIndex(addr1.address, 7);
-    assert.equal(newIndex.index, 2);
+    const newIndex = await ercordinal.getIdToIndex(addr1.address, 5);
+    assert.equal(newIndex.index, 1);
   });
 
   it("Should remove token index key from owner", async function () {
@@ -176,69 +274,27 @@ describe("ErcOrdinal", function () {
   });
 
   it("Should transfer correct ids", async function () {
-    const [, addr1] = await hre.ethers.getSigners();
+    const [owner, addr1] = await hre.ethers.getSigners();
+    const startRecipient = await ercordinal.getAddressToIds(addr1.address);
+    const startSender = await ercordinal.getAddressToIds(owner.address);
     await ercordinal.transferMany(addr1.address, [0, 8, 3]);
     await ercordinal.transferMany(addr1.address, [4, 2, 1]);
 
     const endingRecipient = await ercordinal.getAddressToIds(addr1.address);
-    console.log(endingRecipient);
-    assert.equal(1, 1);
+    const endingSender = await ercordinal.getAddressToIds(owner.address);
+
+    assert.equal(endingRecipient.length, startRecipient.length + 6);
+    assert.equal(endingSender.length, startSender.length - 6);
   });
 
-  it("Should transfer-receive = tail-head, recipent dont hold any", async function () {
-    const [owner, addr1] = await hre.ethers.getSigners();
-    const startingSender = await ercordinal.getAddressToIds(owner.address);
-
-    await ercordinal.transfer(addr1.address, 5);
-
+  it("Should mint many tokens", async function () {
+    const [, addr1] = await hre.ethers.getSigners();
+    const startRecipient = await ercordinal.getAddressToIds(addr1.address);
+    await ercordinal.connect(addr1).mintMany(5, {
+      value: hre.ethers.utils.parseEther("0.1"),
+    });
     const endingRecipient = await ercordinal.getAddressToIds(addr1.address);
-
-    assert.equal(
-      hre.ethers.BigNumber.from(startingSender[11]).toNumber(),
-      hre.ethers.BigNumber.from(endingRecipient[0]).toNumber()
-    );
-    assert.equal(
-      hre.ethers.BigNumber.from(startingSender[10]).toNumber(),
-      hre.ethers.BigNumber.from(endingRecipient[1]).toNumber()
-    );
-    assert.equal(
-      hre.ethers.BigNumber.from(startingSender[9]).toNumber(),
-      hre.ethers.BigNumber.from(endingRecipient[2]).toNumber()
-    );
-  });
-  it("Should transfer-receive = tail-head, recipent hold already", async function () {
-    const [owner, addr1] = await hre.ethers.getSigners();
-    const startingSender = await ercordinal.getAddressToIds(owner.address);
-
-    await ercordinal.transfer(addr1.address, 2);
-    await ercordinal.transfer(addr1.address, 3);
-
-    const endingRecipient = await ercordinal.getAddressToIds(addr1.address);
-
-    //first two is a push, add to the tail
-    //because holder dont hold any
-    assert.equal(
-      hre.ethers.BigNumber.from(startingSender[11]).toNumber(),
-      hre.ethers.BigNumber.from(endingRecipient[4]).toNumber()
-    );
-    assert.equal(
-      hre.ethers.BigNumber.from(startingSender[10]).toNumber(),
-      hre.ethers.BigNumber.from(endingRecipient[3]).toNumber()
-    );
-    //next transfer is insert to head
-    //because holder already hold tokens
-    assert.equal(
-      hre.ethers.BigNumber.from(startingSender[9]).toNumber(),
-      hre.ethers.BigNumber.from(endingRecipient[0]).toNumber()
-    );
-    assert.equal(
-      hre.ethers.BigNumber.from(startingSender[8]).toNumber(),
-      hre.ethers.BigNumber.from(endingRecipient[1]).toNumber()
-    );
-    assert.equal(
-      hre.ethers.BigNumber.from(startingSender[7]).toNumber(),
-      hre.ethers.BigNumber.from(endingRecipient[2]).toNumber()
-    );
+    assert.equal(endingRecipient.length, startRecipient.length + 5);
   });
 
   it("Should withdraw", async function () {
@@ -276,9 +332,3 @@ describe("ErcOrdinal", function () {
     );
   });
 });
-
-/*[0,1,2,3,4,5,,6,7,8,9,10,11,12]
-senderlastindex = 6 -1 = 5;
-senderlasttokenid = addtoid[5] = 6
-idtoindex[recipient][6].index = 7
-*/

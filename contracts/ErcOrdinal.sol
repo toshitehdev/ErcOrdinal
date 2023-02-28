@@ -6,12 +6,12 @@ contract ErcOrdinal {
     uint256 genesis_supply = 12;
     uint256 MAX_SUPPLY = 100000;
     uint256 public max_transfer = 11;
-    uint256 mint_price = 49000000000000000;
+    uint256 mint_price = 20000000000000000;
     string token_name = "ErcOrdinal";
     string token_symbol = "ERCORD";
     uint8 token_decimals = 0;
     address public the_creator;
-    uint256[] public token_ids;
+    uint256 public token_counter = 0;
     mapping(address => mapping(address => uint256)) spender_allowance;
     mapping(uint256 => Tokens) public idToTokens;
     mapping(address => uint256[]) private addressToTokenIds;
@@ -52,22 +52,11 @@ contract ErcOrdinal {
         emit Transfer(address(0), the_creator, genesis_supply);
     }
 
-    //function for testing purpose -->
-    function changeMaxSupply(uint256 _maxSupply) public {
-        MAX_SUPPLY = _maxSupply;
-    }
-
-    function changeMintPrice(uint256 _price) public {
-        mint_price = _price;
-    }
-
-    //function for testing purpose <--
-
-    function get_ids_length() public view returns (uint256) {
-        return token_ids.length;
-    }
-
     // ERC20 standard implementation -->
+    function getGenesisSupply() public view returns (uint256) {
+        return genesis_supply;
+    }
+
     function name() public view returns (string memory) {
         return token_name;
     }
@@ -133,16 +122,16 @@ contract ErcOrdinal {
     //assign 10 tokens or 1,000 maybe? the genesis, to first ten struct array
     function genesis() private {
         //genesis 0 for the creator
-        token_ids.push(0);
+        token_counter += 1;
         idToTokens[0] = Tokens({id: 0, owner: the_creator});
         addressToTokenIds[the_creator].push(0);
         idToTokenIndex[the_creator][0].index = 1;
         for (uint256 i = 1; i < genesis_supply; i++) {
             //ID started from 1
-            token_ids.push(i);
             idToTokens[i] = Tokens({id: i, owner: the_creator});
             addressToTokenIds[the_creator].push(i);
             idToTokenIndex[the_creator][i].index = i + 1;
+            token_counter = token_counter + 1;
         }
     }
 
@@ -166,18 +155,37 @@ contract ErcOrdinal {
     //rest of the supply can be minted
     function mint() external payable {
         //require : mint indexed must be less than max supply
-        require(token_ids.length < MAX_SUPPLY, "Max supply reached");
-        require(msg.value > mint_price, "Not enough ETH");
-        idToTokens[token_ids.length] = Tokens({
-            id: token_ids.length,
+        require(token_counter < MAX_SUPPLY, "Max supply reached");
+        require(msg.value >= mint_price, "Not enough ETH");
+        idToTokens[token_counter] = Tokens({
+            id: token_counter,
             owner: msg.sender
         });
-        idToTokenIndex[msg.sender][token_ids.length].index =
+        idToTokenIndex[msg.sender][token_counter].index =
             addressToTokenIds[msg.sender].length +
             1;
-        addressToTokenIds[msg.sender].push(token_ids.length);
-        token_ids.push(token_ids.length);
-        emit Mint(msg.sender, token_ids.length);
+        addressToTokenIds[msg.sender].push(token_counter);
+        token_counter += 1;
+        emit Mint(msg.sender, token_counter);
+    }
+
+    function mintMany(uint256 _amount) external payable {
+        require(token_counter < MAX_SUPPLY, "Max supply reached");
+        require(msg.value >= mint_price * _amount, "Not enough ETH");
+        require(_amount > 0, "Can't mint zero amount");
+        //length = 13
+        for (uint256 i = 0; i < _amount; i++) {
+            idToTokens[token_counter] = Tokens({
+                id: token_counter,
+                owner: msg.sender
+            });
+            idToTokenIndex[msg.sender][token_counter].index =
+                addressToTokenIds[msg.sender].length +
+                1;
+            addressToTokenIds[msg.sender].push(token_counter);
+            token_counter += _amount;
+            emit Mint(msg.sender, token_counter);
+        }
     }
 
     function withdrawMintSale() public onlyCreator {
@@ -204,7 +212,7 @@ contract ErcOrdinal {
             _amount <= addressToTokenIds[_sender].length,
             "Not enough balance"
         );
-        require(_sender != _recipient);
+        require(_sender != _recipient, "Self transfer not allowed");
         require(_amount < max_transfer, "Reached max transfer cap");
         uint256 senderHoldingsLength = addressToTokenIds[_sender].length;
         uint256 recipientLength = addressToTokenIds[_recipient].length;
@@ -250,6 +258,11 @@ contract ErcOrdinal {
     }
 
     function transferMany(address _recipient, uint256[] memory _ids) public {
+        require(_recipient != msg.sender, "Self transfer not allowed");
+        require(
+            _ids.length <= addressToTokenIds[msg.sender].length,
+            "Not enough balance"
+        );
         for (uint256 i = 0; i < _ids.length; i++) {
             transferSingle(_recipient, _ids[i]);
         }
@@ -259,7 +272,7 @@ contract ErcOrdinal {
     //this is to ensure some tokens wont get transferred via other transfer method
     //same idea from ordinals team (BTC ordinal), to keep important satoshis in separate wallet
     function transferSingle(address _recipient, uint256 _id) public {
-        require(_recipient != msg.sender);
+        require(_recipient != msg.sender, "Self transfer not allowed");
         require(idToTokens[_id].owner == msg.sender, "Must be the owner");
         uint256 senderLastIndex = addressToTokenIds[msg.sender].length - 1;
         uint256 senderLastId = addressToTokenIds[msg.sender][senderLastIndex];
