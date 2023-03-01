@@ -35,7 +35,6 @@ contract ErcOrdinal {
     struct Tokens {
         uint256 id;
         address owner;
-        // string rarity;
     }
     modifier onlyCreator() {
         require(
@@ -102,7 +101,6 @@ contract ErcOrdinal {
         address _recipient,
         uint256 _amount
     ) public returns (bool) {
-        // is this Uniswap self transfer?
         require(
             spender_allowance[_sender][msg.sender] >= _amount,
             "Not enough allowance"
@@ -121,7 +119,7 @@ contract ErcOrdinal {
         addressToTokenIds[the_creator].push(0);
         idToTokenIndex[the_creator][0].index = 1;
         for (uint256 i = 1; i < genesis_supply; i++) {
-            //ID started from 1
+            //.index started from 1
             idToTokens[i] = Tokens({id: i, owner: the_creator});
             addressToTokenIds[the_creator].push(i);
             idToTokenIndex[the_creator][i].index = i + 1;
@@ -167,7 +165,6 @@ contract ErcOrdinal {
         require(token_counter < MAX_SUPPLY, "Max supply reached");
         require(msg.value >= mint_price * _amount, "Not enough ETH");
         require(_amount > 0, "Can't mint zero amount");
-        //length = 13
         for (uint256 i = 0; i < _amount; i++) {
             idToTokens[token_counter] = Tokens({
                 id: token_counter,
@@ -239,7 +236,6 @@ contract ErcOrdinal {
                 addressToTokenIds[_recipient].push(idToMove);
                 idToTokenIndex[_recipient][senderLastTokenId].index = i;
                 addressToTokenIds[_recipient][i - 1] = senderLastTokenId;
-
                 //change the tokens owner
                 idToTokens[senderLastTokenId].owner = _recipient;
                 //take out ids, no need to know the ids
