@@ -3,9 +3,8 @@
 pragma solidity ^0.8.8;
 
 contract ErcOrdinal {
-    uint256 genesis_supply = 12;
-    uint256 MAX_SUPPLY = 100000;
-    uint256 public max_transfer = 11;
+    uint256 genesis_supply = 150;
+    uint256 MAX_SUPPLY = 50000;
     uint256 mint_price = 20000000000000000;
     string token_name = "ErcOrdinal";
     string token_symbol = "ERCORD";
@@ -115,11 +114,6 @@ contract ErcOrdinal {
 
     // ERC20 standard implementation <--
 
-    function changeMaxTransfer(uint256 _amount) public onlyCreator {
-        max_transfer = _amount;
-    }
-
-    //assign 10 tokens or 1,000 maybe? the genesis, to first ten struct array
     function genesis() private {
         //genesis 0 for the creator
         token_counter += 1;
@@ -213,7 +207,6 @@ contract ErcOrdinal {
             "Not enough balance"
         );
         require(_sender != _recipient, "Self transfer not allowed");
-        require(_amount < max_transfer, "Reached max transfer cap");
         uint256 senderHoldingsLength = addressToTokenIds[_sender].length;
         uint256 recipientLength = addressToTokenIds[_recipient].length;
         if (recipientLength < 1) {

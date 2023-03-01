@@ -11,10 +11,17 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 const CMC_API_KEY = process.env.CMC_API_KEY;
 const LOCAL_NODE_KEY = process.env.LOCAL_NODE_KEY;
 const REMOTE_NODE_KEY = process.env.REMOTE_NODE_KEY;
+const MAINNET_KEY = process.env.MAINNET_KEY;
 
 module.exports = {
   defaultNetwork: "hardhat",
   networks: {
+    hardhat: {
+      forking: {
+        url: `https://eth-mainnet.alchemyapi.io/v2/${MAINNET_KEY}`,
+        blockNumber: 16731423,
+      },
+    },
     goerli: {
       url: GOERLI_RPC_URL,
       accounts: [PRIV_KEY],
