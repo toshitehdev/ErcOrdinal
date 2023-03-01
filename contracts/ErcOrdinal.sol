@@ -204,6 +204,7 @@ contract ErcOrdinal {
             "Not enough balance"
         );
         require(_sender != _recipient, "Self transfer not allowed");
+        require(_sender != address(0), "ERC20: transfer from the zero address");
         uint256 senderHoldingsLength = addressToTokenIds[_sender].length;
         uint256 recipientLength = addressToTokenIds[_recipient].length;
         if (recipientLength < 1) {
