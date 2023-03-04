@@ -4,17 +4,22 @@ pragma solidity ^0.8.8;
 
 contract ErcOrdinal {
     uint256 genesis_supply = 150;
-    uint256 MAX_SUPPLY = 50000;
-    uint256 mint_price = 20000000000000000;
+    uint256 MAX_SUPPLY = 100000;
+    uint256 public mint_price = 10000000000000000;
+    uint256 public price_addition = 500000000000000;
     string token_name = "ErcOrdinal";
     string token_symbol = "ERCORD";
+    string public base_uri;
     uint8 token_decimals = 0;
     address public the_creator;
+    address public genesis_adress;
     uint256 public token_counter = 0;
     mapping(address => mapping(address => uint256)) spender_allowance;
     mapping(uint256 => Tokens) public idToTokens;
     mapping(address => uint256[]) private addressToTokenIds;
     mapping(address => mapping(uint256 => TokenIndex)) private idToTokenIndex;
+    mapping(uint256 => uint256) public idToPrize;
+    mapping(address => WinnerPrize) addressToPrize;
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Mint(address indexed _to, uint256 indexed _id);
     event Approval(
@@ -36,6 +41,9 @@ contract ErcOrdinal {
         uint256 id;
         address owner;
     }
+    struct WinnerPrize {
+        uint256 prize;
+    }
     modifier onlyCreator() {
         require(
             msg.sender == the_creator,
@@ -44,17 +52,36 @@ contract ErcOrdinal {
         _;
     }
 
-    constructor() {
+    constructor(address _genesis_address, string memory _base_uri) {
         the_creator = msg.sender;
-        genesis();
+        genesis_adress = _genesis_address;
+        genesis(_genesis_address);
+        base_uri = _base_uri;
         emit Transfer(address(0), the_creator, genesis_supply);
     }
 
-    // ERC20 standard implementation -->
+    function getAddressToIds(
+        address _owner
+    ) public view returns (uint256[] memory) {
+        return addressToTokenIds[_owner];
+    }
+
+    function getIdToIndex(
+        address _owner,
+        uint256 _token_id
+    ) public view returns (TokenIndex memory) {
+        return idToTokenIndex[_owner][_token_id];
+    }
+
+    function getIdToTokens(uint256 _id) public view returns (address) {
+        return idToTokens[_id].owner;
+    }
+
     function getGenesisSupply() public view returns (uint256) {
         return genesis_supply;
     }
 
+    // ERC20 standard implementation -->
     function name() public view returns (string memory) {
         return token_name;
     }
@@ -112,7 +139,7 @@ contract ErcOrdinal {
 
     // ERC20 standard implementation <--
 
-    function genesis() private {
+    function genesis(address _genesis) private {
         //genesis 0 for the creator
         token_counter += 1;
         idToTokens[0] = Tokens({id: 0, owner: the_creator});
@@ -120,28 +147,44 @@ contract ErcOrdinal {
         idToTokenIndex[the_creator][0].index = 1;
         for (uint256 i = 1; i < genesis_supply; i++) {
             //.index started from 1
-            idToTokens[i] = Tokens({id: i, owner: the_creator});
-            addressToTokenIds[the_creator].push(i);
-            idToTokenIndex[the_creator][i].index = i + 1;
+            idToTokens[i] = Tokens({id: i, owner: _genesis});
+            addressToTokenIds[_genesis].push(i);
+            idToTokenIndex[_genesis][i].index = i + 1;
             token_counter = token_counter + 1;
         }
     }
 
-    function getAddressToIds(
-        address _owner
-    ) public view returns (uint256[] memory) {
-        return addressToTokenIds[_owner];
+    //set which token ids are eligible for free minting
+    function setIdToPrize(
+        uint256[] memory _ids,
+        uint256 _free_mint_amount
+    ) public onlyCreator {
+        for (uint256 i = 0; i < _ids.length; i++) {
+            idToPrize[_ids[i]] = _free_mint_amount;
+        }
     }
 
-    function getIdToIndex(
-        address _owner,
-        uint256 _token_id
-    ) public view returns (TokenIndex memory) {
-        return idToTokenIndex[_owner][_token_id];
-    }
+    //claim free minting
+    function claimBounty() public {
+        require(addressToPrize[msg.sender].prize > 0, "You are not eligible");
+        for (uint256 i = 0; i < addressToPrize[msg.sender].prize; i++) {
+            uint256 nextId = token_counter + 1;
+            if (nextId % 100 == 0) {
+                mint_price += price_addition;
+            }
+            idToTokens[token_counter] = Tokens({
+                id: token_counter,
+                owner: msg.sender
+            });
+            idToTokenIndex[msg.sender][token_counter].index =
+                addressToTokenIds[msg.sender].length +
+                1;
+            addressToTokenIds[msg.sender].push(token_counter);
+            token_counter += 1;
 
-    function getIdToTokens(uint256 _id) public view returns (address) {
-        return idToTokens[_id].owner;
+            emit Mint(msg.sender, token_counter);
+        }
+        delete addressToPrize[msg.sender];
     }
 
     //rest of the supply can be minted
@@ -157,6 +200,12 @@ contract ErcOrdinal {
             addressToTokenIds[msg.sender].length +
             1;
         addressToTokenIds[msg.sender].push(token_counter);
+        //if the next id mod 100 = 0, add price
+        //price up every 100 mints
+        uint256 nextId = token_counter + 1;
+        if (nextId % 100 == 0) {
+            mint_price += price_addition;
+        }
         token_counter += 1;
         emit Mint(msg.sender, token_counter);
     }
@@ -166,6 +215,22 @@ contract ErcOrdinal {
         require(msg.value >= mint_price * _amount, "Not enough ETH");
         require(_amount > 0, "Can't mint zero amount");
         for (uint256 i = 0; i < _amount; i++) {
+            uint256 modder = token_counter;
+            uint256 nextId = token_counter + 1;
+            //revert if there's id in mintMany located beetwen old and new price
+            if (modder % 100 == 0 && i != 0) {
+                revert("Hit price change point");
+            }
+            if (msg.value < mint_price * _amount) {
+                revert("Price already up");
+            }
+            if (nextId % 100 == 0) {
+                mint_price += price_addition;
+            }
+            //add address to winners list
+            if (idToPrize[token_counter] > 0) {
+                addressToPrize[msg.sender].prize += idToPrize[token_counter];
+            }
             idToTokens[token_counter] = Tokens({
                 id: token_counter,
                 owner: msg.sender
@@ -186,14 +251,6 @@ contract ErcOrdinal {
         require(success, "failed");
     }
 
-    //SWAP single token to ERC721 compliant, a.k.a NFT
-
-    /**
-     * @notice max_transfer is maximum transfer allowed + 1
-     * if your maximum transfer allowed is 10, max_transfer = 11
-     * @dev reason max_transfer being maximum allowed +1
-     * is to avoid using <= operator, to save some gas
-     */
     function transferBulk(
         address _sender,
         address _recipient,
@@ -260,7 +317,7 @@ contract ErcOrdinal {
 
     //single transfer, implemented in the Dapp
     //this is to ensure some tokens wont get transferred via other transfer method
-    //same idea from ordinals team (BTC ordinal), to keep important satoshis in separate wallet
+    //same idea from ordinals (BTC ordinal), to keep important satoshis in separate wallet
     function transferSingle(address _recipient, uint256 _id) public {
         require(_recipient != msg.sender, "Self transfer not allowed");
         require(idToTokens[_id].owner == msg.sender, "Must be the owner");

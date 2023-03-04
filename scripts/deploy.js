@@ -2,7 +2,10 @@ const hre = require("hardhat");
 
 async function main() {
   const ErcOrdinal = await hre.ethers.getContractFactory("ErcOrdinal");
-  const ercordinal = await ErcOrdinal.deploy();
+  const ercordinal = await ErcOrdinal.deploy(
+    "0x1e9eF3D5931AE575B97BCb24d8ffB8aE06533583",
+    "BASE_URI"
+  );
 
   await ercordinal.deployed();
   console.log(`Deployed to: ${ercordinal.address}`);
