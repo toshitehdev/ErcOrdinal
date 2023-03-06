@@ -51,6 +51,7 @@ contract ErcOrdinal {
         bool is_eligible;
         uint256 prize_amount;
         bool is_claimed;
+        bool from_claiming;
     }
     struct EligibleIdForBounty {
         bool is_eligible;
@@ -183,6 +184,7 @@ contract ErcOrdinal {
             idIsEligible[_eligible_ids[i]].is_eligible = true;
             idIsEligible[_eligible_ids[i]].prize_amount = _amount;
             idIsEligible[_eligible_ids[i]].is_claimed = false;
+            idIsEligible[_eligible_ids[i]].from_claiming = false;
         }
     }
 
@@ -198,6 +200,9 @@ contract ErcOrdinal {
             uint256 nextId = token_counter + 1;
             if (nextId % 500 == 0) {
                 mint_price += price_addition;
+            }
+            if (idIsEligible[token_counter].is_eligible == true) {
+                idIsEligible[token_counter].from_claiming = true;
             }
             idToTokens[token_counter] = Tokens({owner: msg.sender});
             idToTokenIndex[msg.sender][token_counter].index =
@@ -227,6 +232,9 @@ contract ErcOrdinal {
             uint256 nextId = token_counter + 1;
             if (nextId % 500 == 0) {
                 mint_price += price_addition;
+            }
+            if (idIsEligible[token_counter].is_eligible == true) {
+                idIsEligible[token_counter].from_claiming = true;
             }
             idToTokens[token_counter] = Tokens({owner: _owner});
             idToTokenIndex[_owner][token_counter].index =
