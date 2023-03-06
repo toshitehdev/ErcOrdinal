@@ -12,6 +12,7 @@ const CMC_API_KEY = process.env.CMC_API_KEY;
 const LOCAL_NODE_KEY = process.env.LOCAL_NODE_KEY;
 const REMOTE_NODE_KEY = process.env.REMOTE_NODE_KEY;
 const MAINNET_KEY = process.env.MAINNET_KEY;
+const REMOTENODE_RPC = process.env.REMOTENODE_RPC;
 
 module.exports = {
   defaultNetwork: "hardhat",
@@ -33,7 +34,7 @@ module.exports = {
       chainid: 31337,
     },
     remotenode: {
-      url: "http://159.223.87.18:8545",
+      url: REMOTENODE_RPC,
       accounts: [REMOTE_NODE_KEY],
       chainid: 1337,
     },
