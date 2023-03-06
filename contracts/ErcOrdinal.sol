@@ -7,21 +7,28 @@ contract ErcOrdinal {
     uint256 MAX_SUPPLY = 100000;
     uint256 public mint_price = 10000000000000000;
     uint256 public price_addition = 500000000000000;
+    uint8 token_decimals = 0;
+    uint256 public token_counter = 0;
     string token_name = "ErcOrdinal";
     string token_symbol = "ERCORD";
     string public base_uri;
-    uint8 token_decimals = 0;
     address public the_creator;
-    address public genesis_adress;
-    uint256 public token_counter = 0;
+    address public genesis_address;
+    address public ercordinal_erc721;
     mapping(address => mapping(address => uint256)) spender_allowance;
     mapping(uint256 => Tokens) public idToTokens;
     mapping(address => uint256[]) private addressToTokenIds;
     mapping(address => mapping(uint256 => TokenIndex)) private idToTokenIndex;
-    mapping(uint256 => uint256) public idToPrize;
-    mapping(address => WinnerPrize) addressToPrize;
+    mapping(uint256 => EligiblePrize) public idIsEligible;
+    mapping(uint256 => EligibleIdForBounty) public idToEligibleForBounty;
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Mint(address indexed _to, uint256 indexed _id);
+    event ClaimBounty(uint256 indexed id);
+    event EligibleBounty(
+        address indexed minter,
+        uint256 indexed id,
+        uint256 prize_amount
+    );
     event Approval(
         address indexed owner,
         address indexed spender,
@@ -38,12 +45,18 @@ contract ErcOrdinal {
         uint256 index;
     }
     struct Tokens {
-        uint256 id;
         address owner;
     }
-    struct WinnerPrize {
-        uint256 prize;
+    struct EligiblePrize {
+        bool is_eligible;
+        uint256 prize_amount;
+        bool is_claimed;
     }
+    struct EligibleIdForBounty {
+        bool is_eligible;
+        uint256 prize_amount;
+    }
+
     modifier onlyCreator() {
         require(
             msg.sender == the_creator,
@@ -54,7 +67,7 @@ contract ErcOrdinal {
 
     constructor(address _genesis_address, string memory _base_uri) {
         the_creator = msg.sender;
-        genesis_adress = _genesis_address;
+        genesis_address = _genesis_address;
         genesis(_genesis_address);
         base_uri = _base_uri;
         emit Transfer(address(0), the_creator, genesis_supply);
@@ -137,77 +150,95 @@ contract ErcOrdinal {
         return true;
     }
 
-    // ERC20 standard implementation <--
-
+    //genesis 0 for the creator
     function genesis(address _genesis) private {
-        //genesis 0 for the creator
         token_counter += 1;
-        idToTokens[0] = Tokens({id: 0, owner: the_creator});
+        idToTokens[0] = Tokens({owner: the_creator});
         addressToTokenIds[the_creator].push(0);
         idToTokenIndex[the_creator][0].index = 1;
         for (uint256 i = 1; i < genesis_supply; i++) {
             //.index started from 1
-            idToTokens[i] = Tokens({id: i, owner: _genesis});
+            idToTokens[i] = Tokens({owner: _genesis});
             addressToTokenIds[_genesis].push(i);
             idToTokenIndex[_genesis][i].index = i + 1;
             token_counter = token_counter + 1;
         }
     }
 
+    //set ercordinal erc721 address
+    function setErc721Address(address _erc721_address) public onlyCreator {
+        ercordinal_erc721 = _erc721_address;
+    }
+
     //set which token ids are eligible for free minting
-    function setIdToPrize(
-        uint256[] memory _ids,
-        uint256 _free_mint_amount
+    function setEligibleIds(
+        uint256[] memory _eligible_ids,
+        uint256 _amount
     ) public onlyCreator {
-        for (uint256 i = 0; i < _ids.length; i++) {
-            idToPrize[_ids[i]] = _free_mint_amount;
+        for (uint256 i = 0; i < _eligible_ids.length; i++) {
+            if (idIsEligible[_eligible_ids[i]].is_eligible == true) {
+                //prevent rewriting prize_amount
+                revert("Id already inserted");
+            }
+            idIsEligible[_eligible_ids[i]].is_eligible = true;
+            idIsEligible[_eligible_ids[i]].prize_amount = _amount;
+            idIsEligible[_eligible_ids[i]].is_claimed = false;
         }
     }
 
     //claim free minting
-    function claimBounty() public {
-        require(addressToPrize[msg.sender].prize > 0, "You are not eligible");
-        for (uint256 i = 0; i < addressToPrize[msg.sender].prize; i++) {
+    function claimBounty(uint256 _id) public {
+        require(
+            idToEligibleForBounty[_id].is_eligible == true,
+            "The id is not eligible"
+        );
+        require(idToTokens[_id].owner == msg.sender, "You are not eligible");
+
+        for (uint256 i = 0; i < idToEligibleForBounty[_id].prize_amount; i++) {
             uint256 nextId = token_counter + 1;
-            if (nextId % 100 == 0) {
+            if (nextId % 500 == 0) {
                 mint_price += price_addition;
             }
-            idToTokens[token_counter] = Tokens({
-                id: token_counter,
-                owner: msg.sender
-            });
+            idToTokens[token_counter] = Tokens({owner: msg.sender});
             idToTokenIndex[msg.sender][token_counter].index =
                 addressToTokenIds[msg.sender].length +
                 1;
             addressToTokenIds[msg.sender].push(token_counter);
             token_counter += 1;
-
             emit Mint(msg.sender, token_counter);
         }
-        delete addressToPrize[msg.sender];
+        idIsEligible[_id].is_claimed = true;
+        delete idToEligibleForBounty[_id];
+        emit ClaimBounty(_id);
     }
 
-    //rest of the supply can be minted
-    function mint() external payable {
-        //require : mint indexed must be less than max supply
-        require(token_counter < MAX_SUPPLY, "Max supply reached");
-        require(msg.value >= mint_price, "Not enough ETH");
-        idToTokens[token_counter] = Tokens({
-            id: token_counter,
-            owner: msg.sender
-        });
-        idToTokenIndex[msg.sender][token_counter].index =
-            addressToTokenIds[msg.sender].length +
-            1;
-        addressToTokenIds[msg.sender].push(token_counter);
-        //if the next id mod 100 = 0, add price
-        //price up every 100 mints
-        uint256 nextId = token_counter + 1;
-        if (nextId % 100 == 0) {
-            mint_price += price_addition;
+    //claim free minting via erc721
+    function claimViaErc721(uint256 _id, address _owner) external {
+        require(
+            msg.sender == ercordinal_erc721,
+            "Only ErcOrdinal ERC721 address can call"
+        );
+        require(
+            idToEligibleForBounty[_id].is_eligible == true,
+            "The id is not eligible"
+        );
+        require(idToTokens[_id].owner == _owner, "You are not eligible");
+        for (uint256 i = 0; i < idToEligibleForBounty[_id].prize_amount; i++) {
+            uint256 nextId = token_counter + 1;
+            if (nextId % 500 == 0) {
+                mint_price += price_addition;
+            }
+            idToTokens[token_counter] = Tokens({owner: _owner});
+            idToTokenIndex[_owner][token_counter].index =
+                addressToTokenIds[_owner].length +
+                1;
+            addressToTokenIds[_owner].push(token_counter);
+            token_counter += 1;
+            emit Mint(_owner, token_counter);
         }
-        token_counter += 1;
-        emit Mint(msg.sender, token_counter);
+        idIsEligible[_id].is_claimed = true;
+        delete idToEligibleForBounty[_id];
+        emit ClaimBounty(_id);
     }
 
     function mintMany(uint256 _amount) external payable {
@@ -218,23 +249,28 @@ contract ErcOrdinal {
             uint256 modder = token_counter;
             uint256 nextId = token_counter + 1;
             //revert if there's id in mintMany located beetwen old and new price
-            if (modder % 100 == 0 && i != 0) {
+            if (modder % 500 == 0 && i != 0) {
                 revert("Hit price change point");
             }
             if (msg.value < mint_price * _amount) {
                 revert("Price already up");
             }
-            if (nextId % 100 == 0) {
+            if (nextId % 500 == 0) {
                 mint_price += price_addition;
             }
-            //add address to winners list
-            if (idToPrize[token_counter] > 0) {
-                addressToPrize[msg.sender].prize += idToPrize[token_counter];
+            //add token id to winners list
+            if (idIsEligible[token_counter].is_eligible == true) {
+                idToEligibleForBounty[token_counter] = EligibleIdForBounty({
+                    is_eligible: true,
+                    prize_amount: idIsEligible[token_counter].prize_amount
+                });
+                emit EligibleBounty(
+                    msg.sender,
+                    token_counter,
+                    idIsEligible[token_counter].prize_amount
+                );
             }
-            idToTokens[token_counter] = Tokens({
-                id: token_counter,
-                owner: msg.sender
-            });
+            idToTokens[token_counter] = Tokens({owner: msg.sender});
             idToTokenIndex[msg.sender][token_counter].index =
                 addressToTokenIds[msg.sender].length +
                 1;
@@ -315,9 +351,10 @@ contract ErcOrdinal {
         }
     }
 
-    //single transfer, implemented in the Dapp
-    //this is to ensure some tokens wont get transferred via other transfer method
-    //same idea from ordinals (BTC ordinal), to keep important satoshis in separate wallet
+    //single transfer, implemented in the Dapp.
+    //This is to ensure some tokens wont get transferred via other transfer method,
+    //same idea from ordinals (BTC ordinal), to keep important satoshis in separate wallet.
+    //This method will be used for erc721 switch as well.
     function transferSingle(address _recipient, uint256 _id) public {
         require(_recipient != msg.sender, "Self transfer not allowed");
         require(idToTokens[_id].owner == msg.sender, "Must be the owner");
