@@ -1,9 +1,42 @@
 const hre = require("hardhat");
 
 async function main() {
+  const localDevAddresses = [
+    "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+  ];
+  const remoteDevAddresses = [
+    "0x1e9eF3D5931AE575B97BCb24d8ffB8aE06533583",
+    "0x1944EA4c79718F149f5F1d0193c7561F149ac8ac",
+  ];
+  const testnetDevAddresses = [
+    "0x1e9eF3D5931AE575B97BCb24d8ffB8aE06533583",
+    "0x1944EA4c79718F149f5F1d0193c7561F149ac8ac",
+  ];
+  const mainnetDevAddresses = [
+    "0x1e9eF3D5931AE575B97BCb24d8ffB8aE06533583",
+    "0x1944EA4c79718F149f5F1d0193c7561F149ac8ac",
+  ];
+
+  const env = "local";
+  function addressToUse() {
+    if (env === "local") {
+      return localDevAddresses;
+    }
+    if (env === "remote") {
+      return remoteDevAddresses;
+    }
+    if (env === "testnet") {
+      return testnetDevAddresses;
+    }
+    if (env === "mainnet") {
+      return mainnetDevAddresses;
+    }
+  }
   const ErcOrdinal = await hre.ethers.getContractFactory("ErcOrdinal");
   const ercordinal = await ErcOrdinal.deploy(
-    "0x1e9eF3D5931AE575B97BCb24d8ffB8aE06533583",
+    addressToUse()[0],
+    addressToUse()[1],
     "BASE_URI"
   );
 

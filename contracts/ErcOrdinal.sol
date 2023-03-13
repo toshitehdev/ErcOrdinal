@@ -3,17 +3,18 @@
 pragma solidity ^0.8.8;
 
 contract ErcOrdinal {
-    uint256 genesis_supply = 150;
+    uint256 genesis_supply = 111;
     uint256 MAX_SUPPLY = 100000;
     uint256 public mint_price = 10000000000000000;
     uint256 public price_addition = 500000000000000;
     uint8 token_decimals = 0;
     uint256 public token_counter = 0;
+    uint256 public free_mint_allocation = 0;
+    uint256 public expired_bounty = 0;
     string token_name = "ErcOrdinal";
     string token_symbol = "ERCORD";
     string public base_uri;
     address public the_creator;
-    address public genesis_address;
     address public ercordinal_erc721;
     mapping(address => mapping(address => uint256)) spender_allowance;
     mapping(uint256 => Tokens) public idToTokens;
@@ -23,12 +24,14 @@ contract ErcOrdinal {
     mapping(uint256 => EligibleIdForBounty) public idToEligibleForBounty;
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Mint(address indexed _to, uint256 indexed _id);
-    event ClaimBounty(uint256 indexed id);
+    event ClaimBounty(uint256 indexed id, uint256 indexed amount);
+    event ExpiredBounty(uint256 indexed id);
     event EligibleBounty(
         address indexed minter,
         uint256 indexed id,
-        uint256 prize_amount
+        uint256 indexed prize_amount
     );
+    event EligibleIds(uint256 indexed id, EligiblePrize eligible_prize);
     event Approval(
         address indexed owner,
         address indexed spender,
@@ -36,7 +39,7 @@ contract ErcOrdinal {
     );
     /**
      * @dev TokenIndex is needed to track index of ID's inserted.
-     * Index started from 1
+     * Index started from 1,
      * because every index (even the non-existing one) is default to 0.
      * @notice this index is different from addressToTokenIds
      * which started from 0, normal array
@@ -47,6 +50,10 @@ contract ErcOrdinal {
     struct Tokens {
         address owner;
     }
+    /** @dev when all of these ids is_claimed  == true
+     *and the rest (the unclaimed one) from_claiming == true
+     *free_mint_allocation - expired_bounty should == 0
+     */
     struct EligiblePrize {
         bool is_eligible;
         uint256 prize_amount;
@@ -66,12 +73,11 @@ contract ErcOrdinal {
         _;
     }
 
-    constructor(address _genesis_address, string memory _base_uri) {
+    constructor(address _dev1, address _dev2, string memory _base_uri) {
         the_creator = msg.sender;
-        genesis_address = _genesis_address;
-        genesis(_genesis_address);
+        genesis(_dev1, _dev2);
         base_uri = _base_uri;
-        emit Transfer(address(0), the_creator, genesis_supply);
+        emit Transfer(address(0), msg.sender, genesis_supply);
     }
 
     function getAddressToIds(
@@ -151,19 +157,60 @@ contract ErcOrdinal {
         return true;
     }
 
-    //genesis 0 for the creator
-    function genesis(address _genesis) private {
-        token_counter += 1;
+    /** @dev Watch out, idToTokenIndex[address][uint256].index started from 1
+     * @param _dev1 and _dev2 assigned initial allocation
+     *
+     */
+    function genesis(address _dev1, address _dev2) private onlyCreator {
+        //genesis 0 for the_creator
         idToTokens[0] = Tokens({owner: the_creator});
         addressToTokenIds[the_creator].push(0);
         idToTokenIndex[the_creator][0].index = 1;
+        EligiblePrize memory eligible_prize = EligiblePrize({
+            is_eligible: true,
+            prize_amount: 10,
+            is_claimed: false,
+            from_claiming: false
+        });
+        token_counter += 1;
         for (uint256 i = 1; i < genesis_supply; i++) {
             //.index started from 1
-            idToTokens[i] = Tokens({owner: _genesis});
-            addressToTokenIds[_genesis].push(i);
-            idToTokenIndex[_genesis][i].index = i + 1;
-            token_counter = token_counter + 1;
+            if (i < 6) {
+                idToTokens[i] = Tokens({owner: _dev1});
+                addressToTokenIds[_dev1].push(i);
+                idToTokenIndex[_dev1][i].index = i;
+                idIsEligible[i] = eligible_prize;
+                emit EligibleIds(i, eligible_prize);
+                idToEligibleForBounty[i] = EligibleIdForBounty({
+                    is_eligible: true,
+                    prize_amount: 10
+                });
+                token_counter += 1;
+            }
+            if (i >= 6 && i < 11) {
+                idToTokens[i] = Tokens({owner: _dev2});
+                addressToTokenIds[_dev2].push(i);
+                idToTokenIndex[_dev2][i].index = i - 5;
+                idToEligibleForBounty[i] = EligibleIdForBounty({
+                    is_eligible: true,
+                    prize_amount: 10
+                });
+                idIsEligible[i] = eligible_prize;
+                emit EligibleIds(i, eligible_prize);
+                idToEligibleForBounty[i] = EligibleIdForBounty({
+                    is_eligible: true,
+                    prize_amount: 10
+                });
+                token_counter += 1;
+            }
+            if (i >= 11) {
+                idToTokens[i] = Tokens({owner: the_creator});
+                addressToTokenIds[the_creator].push(i);
+                idToTokenIndex[the_creator][i].index = i - 9;
+                token_counter += 1;
+            }
         }
+        free_mint_allocation = 100;
     }
 
     //set ercordinal erc721 address
@@ -176,16 +223,68 @@ contract ErcOrdinal {
         uint256[] memory _eligible_ids,
         uint256 _amount
     ) public onlyCreator {
+        uint256 currentAlloc = token_counter +
+            (free_mint_allocation - expired_bounty) +
+            (_eligible_ids.length * _amount);
+        require(
+            currentAlloc < MAX_SUPPLY,
+            "Can't set free mint more than max supply"
+        );
         for (uint256 i = 0; i < _eligible_ids.length; i++) {
             if (idIsEligible[_eligible_ids[i]].is_eligible == true) {
                 //prevent rewriting prize_amount
                 revert("Id already inserted");
             }
-            idIsEligible[_eligible_ids[i]].is_eligible = true;
-            idIsEligible[_eligible_ids[i]].prize_amount = _amount;
-            idIsEligible[_eligible_ids[i]].is_claimed = false;
-            idIsEligible[_eligible_ids[i]].from_claiming = false;
+            if (_eligible_ids[i] + _amount > MAX_SUPPLY - currentAlloc) {
+                revert("Can't set free mint more than max supply");
+            }
+            EligiblePrize memory eligible_prize = EligiblePrize({
+                is_eligible: true,
+                prize_amount: _amount,
+                is_claimed: false,
+                from_claiming: false
+            });
+            idIsEligible[_eligible_ids[i]] = eligible_prize;
+            emit EligibleIds(_eligible_ids[i], eligible_prize);
         }
+        free_mint_allocation =
+            (_eligible_ids.length * _amount) +
+            free_mint_allocation;
+    }
+
+    //set uniswap resurrect
+    ///@notice give free mint eligibility for ids inside uniswap pool
+    function setUniswapResurrection(
+        uint256[] memory _eligible_ids,
+        uint256 _amount
+    ) public onlyCreator {
+        uint256 currentAlloc = token_counter +
+            (free_mint_allocation - expired_bounty) +
+            (_eligible_ids.length * _amount);
+        require(
+            currentAlloc < MAX_SUPPLY,
+            "Can't set free mint more than max supply"
+        );
+        for (uint256 i = 0; i < _eligible_ids.length; i++) {
+            if (_eligible_ids[i] + _amount > MAX_SUPPLY - currentAlloc) {
+                revert("Can't set free mint more than max supply");
+            }
+            EligiblePrize memory eligible_prize = EligiblePrize({
+                is_eligible: true,
+                prize_amount: _amount,
+                is_claimed: false,
+                from_claiming: false
+            });
+            idIsEligible[_eligible_ids[i]] = eligible_prize;
+            idToEligibleForBounty[_eligible_ids[i]] = EligibleIdForBounty({
+                is_eligible: true,
+                prize_amount: _amount
+            });
+            emit EligibleIds(_eligible_ids[i], eligible_prize);
+        }
+        free_mint_allocation =
+            (_eligible_ids.length * _amount) +
+            free_mint_allocation;
     }
 
     //claim free minting
@@ -197,12 +296,17 @@ contract ErcOrdinal {
         require(idToTokens[_id].owner == msg.sender, "You are not eligible");
 
         for (uint256 i = 0; i < idToEligibleForBounty[_id].prize_amount; i++) {
+            if (token_counter >= MAX_SUPPLY) {
+                revert("Claiming reached max supply");
+            }
             uint256 nextId = token_counter + 1;
             if (nextId % 500 == 0) {
                 mint_price += price_addition;
             }
             if (idIsEligible[token_counter].is_eligible == true) {
                 idIsEligible[token_counter].from_claiming = true;
+                expired_bounty += idIsEligible[token_counter].prize_amount;
+                emit ExpiredBounty(token_counter);
             }
             idToTokens[token_counter] = Tokens({owner: msg.sender});
             idToTokenIndex[msg.sender][token_counter].index =
@@ -213,8 +317,9 @@ contract ErcOrdinal {
             emit Mint(msg.sender, token_counter);
         }
         idIsEligible[_id].is_claimed = true;
+        free_mint_allocation -= idToEligibleForBounty[_id].prize_amount;
         delete idToEligibleForBounty[_id];
-        emit ClaimBounty(_id);
+        emit ClaimBounty(_id, idToEligibleForBounty[_id].prize_amount);
     }
 
     //claim free minting via erc721
@@ -223,6 +328,9 @@ contract ErcOrdinal {
             msg.sender == ercordinal_erc721,
             "Only ErcOrdinal ERC721 address can call"
         );
+        if (token_counter >= MAX_SUPPLY) {
+            revert("Claiming reached max supply");
+        }
         require(
             idToEligibleForBounty[_id].is_eligible == true,
             "The id is not eligible"
@@ -235,6 +343,8 @@ contract ErcOrdinal {
             }
             if (idIsEligible[token_counter].is_eligible == true) {
                 idIsEligible[token_counter].from_claiming = true;
+                expired_bounty += idIsEligible[token_counter].prize_amount;
+                emit ExpiredBounty(token_counter);
             }
             idToTokens[token_counter] = Tokens({owner: _owner});
             idToTokenIndex[_owner][token_counter].index =
@@ -245,12 +355,17 @@ contract ErcOrdinal {
             emit Mint(_owner, token_counter);
         }
         idIsEligible[_id].is_claimed = true;
+        free_mint_allocation -= idToEligibleForBounty[_id].prize_amount;
         delete idToEligibleForBounty[_id];
-        emit ClaimBounty(_id);
+        emit ClaimBounty(_id, idToEligibleForBounty[_id].prize_amount);
     }
 
     function mintMany(uint256 _amount) external payable {
-        require(token_counter < MAX_SUPPLY, "Max supply reached");
+        uint256 token_left = free_mint_allocation - expired_bounty;
+        require(token_counter < MAX_SUPPLY - token_left, "Max supply reached");
+        if (token_counter + _amount > MAX_SUPPLY - token_left) {
+            revert("Can't mint more than max supply");
+        }
         require(msg.value >= mint_price * _amount, "Not enough ETH");
         require(_amount > 0, "Can't mint zero amount");
         for (uint256 i = 0; i < _amount; i++) {
@@ -295,6 +410,7 @@ contract ErcOrdinal {
         require(success, "failed");
     }
 
+    ///@dev read this one carefully, easy to get lost in it ^_^
     function transferBulk(
         address _sender,
         address _recipient,
@@ -359,10 +475,6 @@ contract ErcOrdinal {
         }
     }
 
-    //single transfer, implemented in the Dapp.
-    //This is to ensure some tokens wont get transferred via other transfer method,
-    //same idea from ordinals (BTC ordinal), to keep important satoshis in separate wallet.
-    //This method will be used for erc721 switch as well.
     function transferSingle(address _recipient, uint256 _id) public {
         require(_recipient != msg.sender, "Self transfer not allowed");
         require(idToTokens[_id].owner == msg.sender, "Must be the owner");

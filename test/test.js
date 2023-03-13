@@ -3,205 +3,206 @@ const hre = require("hardhat");
 const { assert, expect } = require("chai");
 const { ABI } = require("../uniABI");
 
+function makeNumber(bignum) {
+  return hre.ethers.BigNumber.from(bignum).toNumber();
+}
+
 describe("ErcOrdinal", function () {
   let ErcOrdinal, ercordinal;
   beforeEach(async function () {
     ErcOrdinal = await hre.ethers.getContractFactory("ErcOrdinal");
-    const [, addr1] = await hre.ethers.getSigners();
-    ercordinal = await ErcOrdinal.deploy(addr1.address, "BASE_URI");
-  });
-
-  it("Claim bounty one", async function () {
     const [, addr1, addr2] = await hre.ethers.getSigners();
-    await ercordinal.setEligibleIds([152], 1);
-    await ercordinal
-      .connect(addr2)
-      .mintMany(10, { value: hre.ethers.utils.parseEther("0.1") });
-    await ercordinal.connect(addr2).claimBounty(152);
-    const endingBalance = await ercordinal.getAddressToIds(addr2.address);
-    const token_counter = await ercordinal.token_counter();
-    await ercordinal.connect(addr2).claimBounty(152);
-    assert.equal(endingBalance.length, 11);
-    assert.equal(token_counter, 161);
+    //constructor params, address 1 and 2 being dev1 and dev2
+    //BASE_URI is the base address for nft metadata on IPFS
+    ercordinal = await ErcOrdinal.deploy(
+      addr1.address,
+      addr2.address,
+      "BASE_URI"
+    );
   });
-
-  // it("Claim bounty multiple, 1 free mint", async function () {
-  //   const [, addr1, addr2] = await hre.ethers.getSigners();
-  //   await ercordinal.setIdToPrize([152, 155, 157], 1);
-  //   await ercordinal
-  //     .connect(addr2)
-  //     .mintMany(10, { value: hre.ethers.utils.parseEther("0.1") });
-  //   await ercordinal.connect(addr2).claimBounty();
-  //   const endingBalance = await ercordinal.getAddressToIds(addr2.address);
-  //   const token_counter = await ercordinal.token_counter();
-  //   assert.equal(endingBalance.length, 13);
-  //   assert.equal(token_counter, 163);
-  // });
-  // it("Claim bounty multiple, > 1 free mint", async function () {
-  //   const [, addr1, addr2] = await hre.ethers.getSigners();
-  //   await ercordinal.setIdToPrize([152, 155, 157], 2);
-  //   await ercordinal
-  //     .connect(addr2)
-  //     .mintMany(10, { value: hre.ethers.utils.parseEther("0.1") });
-  //   await ercordinal.connect(addr2).claimBounty();
-  //   const endingBalance = await ercordinal.getAddressToIds(addr2.address);
-  //   const token_counter = await ercordinal.token_counter();
-  //   assert.equal(endingBalance.length, 16);
-  //   assert.equal(token_counter, 166);
-  //   await expect(ercordinal.connect(addr2).claimBounty()).to.be.revertedWith(
-  //     "You are not eligible"
-  //   );
-  //   await ercordinal.setIdToPrize([300, 400, 500], 2);
-  //   const newIdToPrize = await ercordinal.idToPrize(300);
-  //   assert.equal(newIdToPrize, 2);
-  // });
-  // it("Claim thru regardless price up", async function () {
-  //   const [, addr1, addr2] = await hre.ethers.getSigners();
-  //   await ercordinal.setIdToPrize([170], 10);
-  //   await ercordinal
-  //     .connect(addr2)
-  //     .mintMany(45, { value: hre.ethers.utils.parseEther("0.45") });
-  //   await ercordinal.connect(addr2).claimBounty();
-  //   const endingBalance = await ercordinal.getAddressToIds(addr2.address);
-  //   const token_counter = await ercordinal.token_counter();
-  //   assert.equal(endingBalance.length, 55);
-  //   assert.equal(token_counter, 205);
-  // });
-
-  // it("Price should still go up even tho it's up because of claim", async function () {
-  //   const [, addr1, addr2] = await hre.ethers.getSigners();
-  //   const old_mint_price = await ercordinal.mint_price();
-  //   await ercordinal.setIdToPrize([170], 100);
-  //   await ercordinal
-  //     .connect(addr2)
-  //     .mintMany(50, { value: hre.ethers.utils.parseEther("0.5") });
-  //   await ercordinal
-  //     .connect(addr2)
-  //     .mintMany(50, { value: hre.ethers.utils.parseEther("0.5") });
-  //   await ercordinal
-  //     .connect(addr2)
-  //     .mintMany(50, { value: hre.ethers.utils.parseEther("0.5") });
-  //   await ercordinal
-  //     .connect(addr2)
-  //     .mintMany(50, { value: hre.ethers.utils.parseEther("0.5") });
-  //   await ercordinal
-  //     .connect(addr2)
-  //     .mintMany(50, { value: hre.ethers.utils.parseEther("0.5") });
-  //   await ercordinal
-  //     .connect(addr2)
-  //     .mintMany(50, { value: hre.ethers.utils.parseEther("0.5") });
-
-  //   await ercordinal.connect(addr2).claimBounty();
-
-  //   const token_counter = await ercordinal.token_counter();
-  //   const new_mint_price = await ercordinal.mint_price();
-
-  //   expect(new_mint_price).to.be.gt(old_mint_price);
-  //   assert.equal(token_counter, 550);
-  // });
-
-  it("Should add base_uri", async function () {
-    const uri = await ercordinal.base_uri();
-    assert.equal(uri, "BASE_URI");
-  });
-  it("Should add supply to genesis address", async function () {
-    const [, addr1] = await hre.ethers.getSigners();
-    const genesisSupply = await ercordinal.getGenesisSupply();
-    const getGenAddSupply =
-      hre.ethers.BigNumber.from(genesisSupply).toNumber() - 1;
-    const checkSupp = await ercordinal.getAddressToIds(addr1.address);
-    assert.equal(getGenAddSupply, checkSupp.length);
-  });
-
-  it("Owner should be msg.sender", async function () {
+  //================== GENESIS/DEPLOY =================================//
+  it("Assign token_creator to deployer", async () => {
     const [owner] = await hre.ethers.getSigners();
-    const creator = await ercordinal.the_creator();
-    assert.equal(owner.address, creator);
+    const the_creator = await ercordinal.the_creator();
+    assert.equal(owner.address, the_creator);
   });
-
-  it("Token counter should be same as genesis supply", async function () {
-    const genesis_supply = await ercordinal.getGenesisSupply();
+  it("Token counter should be genesis supply - 1", async () => {
     const token_counter = await ercordinal.token_counter();
-    assert.equal(
-      hre.ethers.BigNumber.from(genesis_supply).toNumber(),
-      hre.ethers.BigNumber.from(token_counter).toNumber()
+    const genesis_supply = await ercordinal.getGenesisSupply();
+    assert.equal(makeNumber(token_counter), makeNumber(genesis_supply));
+  });
+  it("Transfer id #0 to deployer", async () => {
+    const [owner] = await hre.ethers.getSigners();
+    const dev1_token = await ercordinal.getAddressToIds(owner.address);
+    assert.equal(dev1_token[0], 0);
+  });
+  it("Transfer 100 token to deployer", async () => {
+    const [owner] = await hre.ethers.getSigners();
+    const dev1_token = await ercordinal.getAddressToIds(owner.address);
+    assert.equal(dev1_token.length, 101);
+  });
+  it("Token index for deployer should correct", async () => {
+    const [owner] = await hre.ethers.getSigners();
+    const deployer_token = await ercordinal.getAddressToIds(owner.address);
+    for (let i = 0; i < deployer_token.length; i++) {
+      const deployer_token_index = await ercordinal.getIdToIndex(
+        owner.address,
+        deployer_token[i]
+      );
+      assert.equal(deployer_token_index.index, i + 1);
+    }
+  });
+  it("Transfer tokens to dev1 and dev2, 5 tokens each", async () => {
+    const [, addr1, addr2] = await hre.ethers.getSigners();
+    const dev1_token = await ercordinal.getAddressToIds(addr1.address);
+    const dev2_token = await ercordinal.getAddressToIds(addr2.address);
+    assert.equal(dev1_token.length, 5);
+    assert.equal(dev2_token.length, 5);
+  });
+  it("Tokens for dev1 is id 1-5", async () => {
+    const [, addr1] = await hre.ethers.getSigners();
+    const dev1_token = await ercordinal.getAddressToIds(addr1.address);
+    for (let i = 0; i < 5; i++) {
+      assert.equal(dev1_token[i], i + 1);
+    }
+  });
+  it("Token index for dev1 should correct", async () => {
+    const [, addr1] = await hre.ethers.getSigners();
+    const dev_token = await ercordinal.getAddressToIds(addr1.address);
+    for (let i = 0; i < dev_token.length; i++) {
+      const dev_token_index = await ercordinal.getIdToIndex(
+        addr1.address,
+        dev_token[i]
+      );
+      assert.equal(dev_token_index.index, i + 1);
+    }
+  });
+  it("Tokens for dev2 is id 6-10", async () => {
+    const [, , addr2] = await hre.ethers.getSigners();
+    const dev1_token = await ercordinal.getAddressToIds(addr2.address);
+    for (let i = 0; i < 5; i++) {
+      assert.equal(dev1_token[i], i + 6);
+    }
+  });
+  it("Token index for dev2 should correct", async () => {
+    const [, , addr2] = await hre.ethers.getSigners();
+    const dev_token = await ercordinal.getAddressToIds(addr2.address);
+    for (let i = 0; i < dev_token.length; i++) {
+      const dev_token_index = await ercordinal.getIdToIndex(
+        addr2.address,
+        dev_token[i]
+      );
+      assert.equal(dev_token_index.index, i + 1);
+    }
+  });
+  it("Id 1-10 should be eligible for 10 free mint each", async () => {
+    for (let i = 1; i < 11; i++) {
+      const idToEligibleForBounty = await ercordinal.idToEligibleForBounty([i]);
+      assert.equal(idToEligibleForBounty.is_eligible, true);
+      assert.equal(idToEligibleForBounty.prize_amount, 10);
+    }
+  });
+  //================== GENESIS/DEPLOY =================================//
+
+  //================== ERC20 Standard getter ===========================//
+  it("Able to get token name", async () => {
+    const name = await ercordinal.name();
+    assert.equal(name, "ErcOrdinal");
+  });
+  it("Able to get token symbol", async () => {
+    const symbol = await ercordinal.symbol();
+    assert.equal(symbol, "ERCORD");
+  });
+  it("Able to get supply", async () => {
+    const supply = await ercordinal.totalSupply();
+    assert.equal(supply, 100000);
+  });
+  it("Able to get token decimal", async () => {
+    const decimals = await ercordinal.decimals();
+    assert.equal(decimals, 0);
+  });
+  it("Able to get correct balance", async () => {
+    const [, , addr2] = await hre.ethers.getSigners();
+    const balanceOf = await ercordinal.balanceOf(addr2.address);
+    assert.equal(balanceOf, 5);
+  });
+  //================== ERC20 Standard getter ============================//
+
+  //================== Transfer ============================//
+  it("Should revert when self tx", async function () {
+    const [owner] = await hre.ethers.getSigners();
+    await expect(ercordinal.transfer(owner.address, 4)).to.be.revertedWith(
+      "Self transfer not allowed"
     );
   });
 
-  it("Should revert when self tx", async function () {
-    const [owner] = await hre.ethers.getSigners();
-    await expect(ercordinal.transfer(owner.address, 4)).to.be.reverted;
-  });
-
   it("Should transfer-receive = tail-head, case: recipent dont hold any", async function () {
-    const [owner, addr1, addr2] = await hre.ethers.getSigners();
+    const [, addr1, addr2] = await hre.ethers.getSigners();
     const startingSender = await ercordinal.getAddressToIds(addr1.address);
 
-    await ercordinal.connect(addr1).transfer(addr2.address, 5);
+    await ercordinal.connect(addr1).transfer(addr2.address, 3);
 
     const endingRecipient = await ercordinal.getAddressToIds(addr2.address);
 
     assert.equal(
-      hre.ethers.BigNumber.from(startingSender[148]).toNumber(),
+      hre.ethers.BigNumber.from(startingSender[4]).toNumber(),
       hre.ethers.BigNumber.from(endingRecipient[0]).toNumber()
     );
     assert.equal(
-      hre.ethers.BigNumber.from(startingSender[147]).toNumber(),
+      hre.ethers.BigNumber.from(startingSender[3]).toNumber(),
       hre.ethers.BigNumber.from(endingRecipient[1]).toNumber()
     );
     assert.equal(
-      hre.ethers.BigNumber.from(startingSender[146]).toNumber(),
+      hre.ethers.BigNumber.from(startingSender[2]).toNumber(),
       hre.ethers.BigNumber.from(endingRecipient[2]).toNumber()
     );
   });
 
   it("Should transfer-receive = tail-head, recipent hold already", async function () {
-    const [owner, addr1, addr2] = await hre.ethers.getSigners();
+    const [, addr1, , addr3] = await hre.ethers.getSigners();
     const startingSender = await ercordinal.getAddressToIds(addr1.address);
-    await ercordinal.connect(addr1).transfer(addr2.address, 2);
-    await ercordinal.connect(addr1).transfer(addr2.address, 3);
-    const endingRecipient = await ercordinal.getAddressToIds(addr2.address);
+    await ercordinal.connect(addr1).transfer(addr3.address, 2);
+    await ercordinal.connect(addr1).transfer(addr3.address, 3);
+    const endingRecipient = await ercordinal.getAddressToIds(addr3.address);
     //first two is a push, add to the tail
     //because holder dont hold any
     assert.equal(
-      hre.ethers.BigNumber.from(startingSender[148]).toNumber(),
+      hre.ethers.BigNumber.from(startingSender[4]).toNumber(),
       hre.ethers.BigNumber.from(endingRecipient[4]).toNumber()
     );
     assert.equal(
-      hre.ethers.BigNumber.from(startingSender[147]).toNumber(),
+      hre.ethers.BigNumber.from(startingSender[3]).toNumber(),
       hre.ethers.BigNumber.from(endingRecipient[3]).toNumber()
     );
     //next transfer is insert to head
     //because holder already hold tokens
     assert.equal(
-      hre.ethers.BigNumber.from(startingSender[146]).toNumber(),
+      hre.ethers.BigNumber.from(startingSender[2]).toNumber(),
       hre.ethers.BigNumber.from(endingRecipient[0]).toNumber()
     );
     assert.equal(
-      hre.ethers.BigNumber.from(startingSender[145]).toNumber(),
+      hre.ethers.BigNumber.from(startingSender[1]).toNumber(),
       hre.ethers.BigNumber.from(endingRecipient[1]).toNumber()
     );
     assert.equal(
-      hre.ethers.BigNumber.from(startingSender[144]).toNumber(),
+      hre.ethers.BigNumber.from(startingSender[0]).toNumber(),
       hre.ethers.BigNumber.from(endingRecipient[2]).toNumber()
     );
   });
 
-  it("Approve, spender_allowance should have _amount > 0", async function () {
+  it("Approve, spender_allowance should be the same as allowance", async function () {
     const [owner, addr1] = await ethers.getSigners();
     const allowance = 1;
     await ercordinal.approve(addr1.address, allowance);
     const _amount = await ercordinal.allowance(owner.address, addr1.address);
-    expect(_amount).to.be.gt(0);
+    assert.equal(_amount, allowance);
   });
 
   it("Should revert if amount sent more than balance", async function () {
     const [, addr1, addr2] = await hre.ethers.getSigners();
-    const amount = 149;
-    await ercordinal.connect(addr1).transfer(addr2.address, amount);
-    //try send amount +1 = 4, while addr1 balance is 3
+    const balanceOf = await ercordinal.balanceOf(addr1.address);
     await expect(
-      ercordinal.connect(addr1).transfer(addr2.address, amount + 1)
+      ercordinal.connect(addr1).transfer(addr2.address, balanceOf + 1)
     ).to.be.revertedWith("Not enough balance");
   });
 
@@ -238,17 +239,6 @@ describe("ErcOrdinal", function () {
     );
   });
 
-  it("Should read correct balance of given address", async function () {
-    const [, addr1] = await hre.ethers.getSigners();
-    const amount = 1;
-    const oldBalance = await ercordinal.balanceOf(addr1.address);
-    await ercordinal.transfer(addr1.address, amount);
-    const newBalance = await ercordinal.balanceOf(addr1.address);
-    const expectedBalance =
-      hre.ethers.BigNumber.from(oldBalance).toNumber() + amount;
-    assert.equal(newBalance, expectedBalance);
-  });
-
   it("Should revert if sender is not the token owner", async function () {
     const [, addr1, addr2] = await hre.ethers.getSigners();
     //addr1 try to send id#1 to addr2, while he's not the owner
@@ -267,67 +257,33 @@ describe("ErcOrdinal", function () {
 
   it("Should add token index key to recipient", async function () {
     const [owner, addr1] = await hre.ethers.getSigners();
-    await ercordinal.connect(addr1).transferSingle(owner.address, 5);
-    await ercordinal.connect(addr1).transferSingle(owner.address, 7);
-    await ercordinal.connect(addr1).transferSingle(owner.address, 8);
-
-    const newIndex = await ercordinal.getIdToIndex(owner.address, 5);
-    assert.equal(newIndex.index, 2);
+    await ercordinal.connect(addr1).transferSingle(owner.address, 2);
+    const newIndex = await ercordinal.getIdToIndex(owner.address, 2);
+    assert.equal(newIndex.index, 102);
   });
 
   it("Should remove token index key from owner", async function () {
     const [owner, addr1, addr2] = await hre.ethers.getSigners();
-    await ercordinal.connect(addr1).transferSingle(owner.address, 5);
-    await ercordinal.connect(addr1).transferSingle(owner.address, 7);
-    await ercordinal.connect(addr1).transferSingle(owner.address, 8);
+    await ercordinal.connect(addr1).transferSingle(owner.address, 2);
+    await ercordinal.connect(addr1).transferSingle(owner.address, 3);
+    await ercordinal.connect(addr1).transferSingle(owner.address, 4);
 
-    await ercordinal.transferSingle(addr2.address, 8);
-    const newIndex = await ercordinal.getIdToIndex(owner.address, 8);
+    await ercordinal.transferSingle(addr2.address, 4);
+    const newIndex = await ercordinal.getIdToIndex(owner.address, 4);
     assert.equal(newIndex.index, 0);
-  });
-
-  it("Should add token id to recipient array", async function () {
-    const [owner, addr1] = await hre.ethers.getSigners();
-    await ercordinal.connect(addr1).transferSingle(owner.address, 5);
-    await ercordinal.connect(addr1).transferSingle(owner.address, 7);
-    await ercordinal.connect(addr1).transferSingle(owner.address, 8);
-    const newArray = await ercordinal.getAddressToIds(owner.address);
-    assert.equal(newArray[1], 5);
-  });
-
-  it("Should change token id position and remove", async function () {
-    const [owner, addr1, addr2] = await hre.ethers.getSigners();
-    await ercordinal.connect(addr1).transferSingle(owner.address, 5);
-    await ercordinal.connect(addr1).transferSingle(owner.address, 7);
-    await ercordinal.connect(addr1).transferSingle(owner.address, 8);
-
-    await ercordinal.transferSingle(addr2.address, 7);
-    const newArray = await ercordinal.getAddressToIds(owner.address);
-    assert.equal(newArray[2], 8);
-  });
-
-  it("Should change token owner", async function () {
-    const [owner, addr1] = await hre.ethers.getSigners();
-    await ercordinal.connect(addr1).transferSingle(owner.address, 7);
-
-    const token = await ercordinal.idToTokens(7);
-    assert.equal(token.owner, owner.address);
   });
 
   it("Should transfer correct ids", async function () {
     const [owner, addr1] = await hre.ethers.getSigners();
-    const startRecipient = await ercordinal.getAddressToIds(owner.address);
-    const startSender = await ercordinal.getAddressToIds(addr1.address);
-    await ercordinal.connect(addr1).transferMany(owner.address, [34, 8, 3]);
-    await ercordinal.connect(addr1).transferMany(owner.address, [4, 2, 1]);
-
-    const endingRecipient = await ercordinal.getAddressToIds(owner.address);
-    const endingSender = await ercordinal.getAddressToIds(addr1.address);
-
-    assert.equal(endingRecipient.length, startRecipient.length + 6);
-    assert.equal(endingSender.length, startSender.length - 6);
+    await ercordinal.connect(addr1).transferMany(owner.address, [2, 3, 4]);
+    for (let i = 0; i < 3; i++) {
+      const token_owner = await ercordinal.getIdToTokens(i + 2);
+      assert.equal(token_owner, owner.address);
+    }
   });
+  //================== Transfer ============================//
 
+  //================== Mint ============================//
   it("Should mint many tokens", async function () {
     const [, addr1] = await hre.ethers.getSigners();
     const startRecipient = await ercordinal.getAddressToIds(addr1.address);
@@ -337,6 +293,69 @@ describe("ErcOrdinal", function () {
     const endingRecipient = await ercordinal.getAddressToIds(addr1.address);
     assert.equal(endingRecipient.length, startRecipient.length + 5);
   });
+
+  it("Mint price should be up, revert when not met", async function () {
+    await ercordinal.mintMany(100, {
+      value: hre.ethers.utils.parseEther("1"),
+    });
+    await ercordinal.mintMany(100, {
+      value: hre.ethers.utils.parseEther("1"),
+    });
+    await ercordinal.mintMany(100, {
+      value: hre.ethers.utils.parseEther("1"),
+    });
+    await expect(
+      ercordinal.mintMany(100, { value: hre.ethers.utils.parseEther("1") })
+    ).to.be.revertedWith("Hit price change point");
+  });
+  //================== Mint ============================//
+
+  //=================== Bounty ==========================================
+  it("Should add free_mint_alloc", async function () {
+    const prize_amount = 10;
+    const old_free_alloc = await ercordinal.free_mint_allocation();
+    await ercordinal.setEligibleIds([115, 120, 125], prize_amount);
+    const new_free_alloc = await ercordinal.free_mint_allocation();
+    assert.equal(
+      makeNumber(old_free_alloc) + prize_amount * 3,
+      makeNumber(new_free_alloc)
+    );
+  });
+  it("Claim bounty one", async function () {
+    const [, , addr2] = await hre.ethers.getSigners();
+    await ercordinal.setEligibleIds([115], 1);
+    await ercordinal
+      .connect(addr2)
+      .mintMany(10, { value: hre.ethers.utils.parseEther("0.1") });
+    await ercordinal.connect(addr2).claimBounty(115);
+    const endingBalance = await ercordinal.getAddressToIds(addr2.address);
+    const token_counter = await ercordinal.token_counter();
+    assert.equal(endingBalance.length, 16);
+    assert.equal(token_counter, 122);
+  });
+  it("Decrease free_mint", async function () {
+    const [, , addr2] = await hre.ethers.getSigners();
+    await ercordinal.setEligibleIds([115], 1);
+    const old_free_alloc = await ercordinal.free_mint_allocation();
+    await ercordinal
+      .connect(addr2)
+      .mintMany(10, { value: hre.ethers.utils.parseEther("0.1") });
+    await ercordinal.connect(addr2).claimBounty(115);
+    const new_free_alloc = await ercordinal.free_mint_allocation();
+    assert.equal(new_free_alloc, makeNumber(old_free_alloc) - 1);
+  });
+  it("Add unclaimed_bounty amount", async function () {
+    const [, , addr2] = await hre.ethers.getSigners();
+    await ercordinal.setEligibleIds([115, 123], 10);
+    await ercordinal
+      .connect(addr2)
+      .mintMany(10, { value: hre.ethers.utils.parseEther("0.1") });
+    await ercordinal.connect(addr2).claimBounty(115);
+    const unclaimed_bounty = await ercordinal.expired_bounty();
+    assert.equal(unclaimed_bounty, 10);
+  });
+
+  //=================== Bounty ==========================================
 
   it("Should withdraw", async function () {
     const [, addr1] = await hre.ethers.getSigners();
@@ -375,44 +394,6 @@ describe("ErcOrdinal", function () {
 });
 
 //==========================================================================
-// it("Mint price should be up, revert when not met", async function () {
-//   const [, addr1] = await hre.ethers.getSigners();
-//   await ercordinal.mint({ value: hre.ethers.utils.parseEther("0.01") });
-//   await expect(
-//     ercordinal
-//       .connect(addr1)
-//       .mint({ value: hre.ethers.utils.parseEther("0.01") })
-//   ).to.be.revertedWith("Not enough ETH");
-// });
-
-// it("Mint should goes thru", async function () {
-//   const [, addr1] = await hre.ethers.getSigners();
-//   await ercordinal.mint({ value: hre.ethers.utils.parseEther("0.01") });
-//   await ercordinal
-//     .connect(addr1)
-//     .mint({ value: hre.ethers.utils.parseEther("0.015") });
-//   const addr1Token = await ercordinal.getAddressToIds(addr1.address);
-//   expect(addr1Token.length).to.be.gt(0);
-// });
-
-// it("Revert if there's id in mintMany located beetwen old and new price", async function () {
-//   const [, addr1] = await hre.ethers.getSigners();
-//   expect(
-//     await ercordinal.mintMany(3, {
-//       value: hre.ethers.utils.parseEther("0.03"),
-//     })
-//   ).to.be.reverted;
-// });
-
-// it("Mint many should goes thru", async function () {
-//   const [, addr1] = await hre.ethers.getSigners();
-//   await ercordinal.mint({ value: hre.ethers.utils.parseEther("0.01") });
-//   await ercordinal
-//     .connect(addr1)
-//     .mintMany(3, { value: hre.ethers.utils.parseEther("0.045") });
-//   const addr1Token = await ercordinal.getAddressToIds(addr1.address);
-//   expect(addr1Token.length).to.be.gt(0);
-// });
 
 // =================== Uniswap Testing, kinda unique case contract ===============
 // Should really be done on testnet
