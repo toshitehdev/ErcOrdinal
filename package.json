@@ -24,6 +24,7 @@
   "scripts": {
     "deploy-dev": "yarn hardhat run scripts/deploy.js --network hardhat",
     "deploy-goerli": "yarn hardhat run scripts/deploy.js --network goerli",
+    "deploy-mainnet": "yarn hardhat run scripts/deploy.js --network mainnet",
     "deploy-localnode": "yarn hardhat run scripts/deploy.js --network localnode",
     "deploy-remotenode": "yarn hardhat run scripts/deploy.js --network remotenode"
   }

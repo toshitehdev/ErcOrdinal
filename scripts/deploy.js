@@ -10,15 +10,15 @@ async function main() {
     "0x1944EA4c79718F149f5F1d0193c7561F149ac8ac",
   ];
   const testnetDevAddresses = [
-    "0x1e9eF3D5931AE575B97BCb24d8ffB8aE06533583",
-    "0x1944EA4c79718F149f5F1d0193c7561F149ac8ac",
+    "0x348bbCF00286870958b69e757526b8bDD4438789",
+    "0x4e32585da8366B1293aD0F9671E781fF98046D54",
   ];
   const mainnetDevAddresses = [
-    "0x1e9eF3D5931AE575B97BCb24d8ffB8aE06533583",
-    "0x1944EA4c79718F149f5F1d0193c7561F149ac8ac",
+    "0x348bbCF00286870958b69e757526b8bDD4438789",
+    "0x4e32585da8366B1293aD0F9671E781fF98046D54",
   ];
 
-  const env = "local";
+  const env = "testnet";
   function addressToUse() {
     if (env === "local") {
       return localDevAddresses;
