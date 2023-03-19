@@ -23,11 +23,11 @@ module.exports = {
         blockNumber: 16731423,
       },
     },
-    goerli: {
-      url: GOERLI_RPC_URL,
-      accounts: [PRIV_KEY],
-      chainId: 5,
-    },
+    // goerli: {
+    //   url: GOERLI_RPC_URL,
+    //   accounts: [PRIV_KEY],
+    //   chainId: 5,
+    // },
     localnode: {
       url: "http://127.0.0.1:8545/",
       accounts: [LOCAL_NODE_KEY],

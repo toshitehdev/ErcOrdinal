@@ -1,4 +1,5 @@
 //SPDX-License-Identifier: MIT
+//https://ercordinal.io
 
 pragma solidity ^0.8.8;
 
@@ -77,7 +78,9 @@ contract ErcOrdinal {
         the_creator = msg.sender;
         genesis(_dev1, _dev2);
         base_uri = _base_uri;
-        emit Transfer(address(0), msg.sender, genesis_supply);
+        emit Transfer(address(0), msg.sender, 101);
+        emit Transfer(address(0), _dev1, 5);
+        emit Transfer(address(0), _dev2, 5);
     }
 
     function getAddressToIds(
@@ -315,6 +318,11 @@ contract ErcOrdinal {
             addressToTokenIds[msg.sender].push(token_counter);
             token_counter += 1;
             emit Mint(msg.sender, token_counter);
+            emit Transfer(
+                address(0),
+                msg.sender,
+                idToEligibleForBounty[_id].prize_amount
+            );
         }
         idIsEligible[_id].is_claimed = true;
         free_mint_allocation -= idToEligibleForBounty[_id].prize_amount;
@@ -353,6 +361,11 @@ contract ErcOrdinal {
             addressToTokenIds[_owner].push(token_counter);
             token_counter += 1;
             emit Mint(_owner, token_counter);
+            emit Transfer(
+                address(0),
+                _owner,
+                idToEligibleForBounty[_id].prize_amount
+            );
         }
         idIsEligible[_id].is_claimed = true;
         free_mint_allocation -= idToEligibleForBounty[_id].prize_amount;
@@ -400,6 +413,7 @@ contract ErcOrdinal {
             addressToTokenIds[msg.sender].push(token_counter);
             token_counter += 1;
             emit Mint(msg.sender, token_counter);
+            emit Transfer(address(0), msg.sender, _amount);
         }
     }
 
