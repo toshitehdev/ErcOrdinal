@@ -37,7 +37,7 @@ async function main() {
   const ercordinal = await ErcOrdinal.deploy(
     addressToUse()[0],
     addressToUse()[1],
-    "BASE_URI"
+    "bafybeibqknpxt2dc2s3o5ulfsvqognymzzaot2xk6hkwonhq3qmyerljfe"
   );
 
   await ercordinal.deployed();
