@@ -318,16 +318,16 @@ contract ErcOrdinal {
             addressToTokenIds[msg.sender].push(token_counter);
             token_counter += 1;
             emit Mint(msg.sender, token_counter);
-            emit Transfer(
-                address(0),
-                msg.sender,
-                idToEligibleForBounty[_id].prize_amount
-            );
         }
         idIsEligible[_id].is_claimed = true;
         free_mint_allocation -= idToEligibleForBounty[_id].prize_amount;
         delete idToEligibleForBounty[_id];
         emit ClaimBounty(_id, idToEligibleForBounty[_id].prize_amount);
+        emit Transfer(
+            address(0),
+            msg.sender,
+            idToEligibleForBounty[_id].prize_amount
+        );
     }
 
     //claim free minting via erc721
@@ -361,16 +361,16 @@ contract ErcOrdinal {
             addressToTokenIds[_owner].push(token_counter);
             token_counter += 1;
             emit Mint(_owner, token_counter);
-            emit Transfer(
-                address(0),
-                _owner,
-                idToEligibleForBounty[_id].prize_amount
-            );
         }
         idIsEligible[_id].is_claimed = true;
         free_mint_allocation -= idToEligibleForBounty[_id].prize_amount;
         delete idToEligibleForBounty[_id];
         emit ClaimBounty(_id, idToEligibleForBounty[_id].prize_amount);
+        emit Transfer(
+            address(0),
+            _owner,
+            idToEligibleForBounty[_id].prize_amount
+        );
     }
 
     function mintMany(uint256 _amount) external payable {
@@ -413,8 +413,8 @@ contract ErcOrdinal {
             addressToTokenIds[msg.sender].push(token_counter);
             token_counter += 1;
             emit Mint(msg.sender, token_counter);
-            emit Transfer(address(0), msg.sender, _amount);
         }
+        emit Transfer(address(0), msg.sender, _amount);
     }
 
     function withdrawMintSale() public onlyCreator {
@@ -487,9 +487,10 @@ contract ErcOrdinal {
         for (uint256 i = 0; i < _ids.length; i++) {
             transferSingle(_recipient, _ids[i]);
         }
+        emit Transfer(msg.sender, _recipient, _ids.length);
     }
 
-    function transferSingle(address _recipient, uint256 _id) public {
+    function transferSingle(address _recipient, uint256 _id) private {
         require(_recipient != msg.sender, "Self transfer not allowed");
         require(idToTokens[_id].owner == msg.sender, "Must be the owner");
         uint256 senderLastIndex = addressToTokenIds[msg.sender].length - 1;
@@ -511,5 +512,33 @@ contract ErcOrdinal {
         idToTokenIndex[msg.sender][senderLastId].index = indexToRemove;
         delete idToTokenIndex[msg.sender][_id];
         addressToTokenIds[msg.sender].pop();
+    }
+
+    function erc721Switch(address _from, uint256 _id) public {
+        require(
+            msg.sender == ercordinal_erc721,
+            "Only ErcOrdinal ERC721 address can call"
+        );
+        require(
+            idToTokens[_id].owner == _from,
+            "Address from is not the owner"
+        );
+        uint256 senderLastIndex = addressToTokenIds[_from].length - 1;
+        uint256 senderLastId = addressToTokenIds[_from][senderLastIndex];
+        idToTokenIndex[msg.sender][_id].index =
+            addressToTokenIds[msg.sender].length +
+            1;
+        addressToTokenIds[msg.sender].push(_id);
+        idToTokens[_id].owner = msg.sender;
+        //find the index position of _id
+        uint256 indexToRemove = idToTokenIndex[_from][_id].index;
+        //move last id on the arrays
+        uint256 idToMove = addressToTokenIds[_from][senderLastIndex];
+        addressToTokenIds[_from][indexToRemove - 1] = idToMove;
+        //update idTotokenIndex for sender
+        idToTokenIndex[_from][senderLastId].index = indexToRemove;
+        delete idToTokenIndex[_from][_id];
+        addressToTokenIds[_from].pop();
+        emit Transfer(_from, msg.sender, 1);
     }
 }

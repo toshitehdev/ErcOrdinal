@@ -20,6 +20,30 @@ describe("ErcOrdinal", function () {
       "BASE_URI"
     );
   });
+  it("Set erc721 address and transfer to that address from specified address", async () => {
+    const [, erc721Contract, addr2] = await hre.ethers.getSigners();
+    const oldLength = await ercordinal.getAddressToIds(addr2.address);
+    await ercordinal.setErc721Address(erc721Contract.address);
+    await ercordinal.connect(erc721Contract).erc721Switch(addr2.address, 7);
+    const tokenOwner = await ercordinal.getIdToTokens(7);
+    const newLength = await ercordinal.getAddressToIds(addr2.address);
+    assert.equal(newLength.length, oldLength.length - 1);
+    assert.equal(tokenOwner, erc721Contract.address);
+  });
+  it("Revert if not erc721 specified address call the function", async () => {
+    const [owner, erc721Contract, addr2, addr3] = await hre.ethers.getSigners();
+    await ercordinal.setErc721Address(erc721Contract.address);
+    await expect(
+      ercordinal.connect(addr3).erc721Switch(addr2.address, 7)
+    ).to.be.revertedWith("Only ErcOrdinal ERC721 address can call");
+  });
+  it("Revert if not the token owner", async () => {
+    const [owner, erc721Contract, addr2] = await hre.ethers.getSigners();
+    await ercordinal.setErc721Address(erc721Contract.address);
+    await expect(
+      ercordinal.connect(erc721Contract).erc721Switch(owner.address, 7)
+    ).to.be.revertedWith("Address from is not the owner");
+  });
   //================== GENESIS/DEPLOY =================================//
   it("Assign token_creator to deployer", async () => {
     const [owner] = await hre.ethers.getSigners();
@@ -239,39 +263,39 @@ describe("ErcOrdinal", function () {
     );
   });
 
-  it("Should revert if sender is not the token owner", async function () {
-    const [, addr1, addr2] = await hre.ethers.getSigners();
-    //addr1 try to send id#1 to addr2, while he's not the owner
-    await expect(
-      ercordinal.connect(addr1).transferSingle(addr2.address, 0)
-    ).to.be.revertedWith("Must be the owner");
-  });
+  // it("Should revert if sender is not the token owner", async function () {
+  //   const [, addr1, addr2] = await hre.ethers.getSigners();
+  //   //addr1 try to send id#1 to addr2, while he's not the owner
+  //   await expect(
+  //     ercordinal.connect(addr1).transferSingle(addr2.address, 0)
+  //   ).to.be.revertedWith("Must be the owner");
+  // });
 
-  it("Should add id length of new owner", async function () {
-    const [owner, addr1] = await hre.ethers.getSigners();
-    const oldLength = await ercordinal.getAddressToIds(owner.address);
-    await ercordinal.connect(addr1).transferSingle(owner.address, 5);
-    const newLength = await ercordinal.getAddressToIds(owner.address);
-    assert.equal(newLength.length, oldLength.length + 1);
-  });
+  // it("Should add id length of new owner", async function () {
+  //   const [owner, addr1] = await hre.ethers.getSigners();
+  //   const oldLength = await ercordinal.getAddressToIds(owner.address);
+  //   await ercordinal.connect(addr1).transferSingle(owner.address, 5);
+  //   const newLength = await ercordinal.getAddressToIds(owner.address);
+  //   assert.equal(newLength.length, oldLength.length + 1);
+  // });
 
-  it("Should add token index key to recipient", async function () {
-    const [owner, addr1] = await hre.ethers.getSigners();
-    await ercordinal.connect(addr1).transferSingle(owner.address, 2);
-    const newIndex = await ercordinal.getIdToIndex(owner.address, 2);
-    assert.equal(newIndex.index, 102);
-  });
+  // it("Should add token index key to recipient", async function () {
+  //   const [owner, addr1] = await hre.ethers.getSigners();
+  //   await ercordinal.connect(addr1).transferSingle(owner.address, 2);
+  //   const newIndex = await ercordinal.getIdToIndex(owner.address, 2);
+  //   assert.equal(newIndex.index, 102);
+  // });
 
-  it("Should remove token index key from owner", async function () {
-    const [owner, addr1, addr2] = await hre.ethers.getSigners();
-    await ercordinal.connect(addr1).transferSingle(owner.address, 2);
-    await ercordinal.connect(addr1).transferSingle(owner.address, 3);
-    await ercordinal.connect(addr1).transferSingle(owner.address, 4);
+  // it("Should remove token index key from owner", async function () {
+  //   const [owner, addr1, addr2] = await hre.ethers.getSigners();
+  //   await ercordinal.connect(addr1).transferSingle(owner.address, 2);
+  //   await ercordinal.connect(addr1).transferSingle(owner.address, 3);
+  //   await ercordinal.connect(addr1).transferSingle(owner.address, 4);
 
-    await ercordinal.transferSingle(addr2.address, 4);
-    const newIndex = await ercordinal.getIdToIndex(owner.address, 4);
-    assert.equal(newIndex.index, 0);
-  });
+  //   await ercordinal.transferSingle(addr2.address, 4);
+  //   const newIndex = await ercordinal.getIdToIndex(owner.address, 4);
+  //   assert.equal(newIndex.index, 0);
+  // });
 
   it("Should transfer correct ids", async function () {
     const [owner, addr1] = await hre.ethers.getSigners();
